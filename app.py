@@ -100,10 +100,14 @@ def parse_date(item):
 def filter_by_date(items, start, end):
     start_dt = datetime.strptime(start, "%Y%m%d")
     end_dt = datetime.strptime(end, "%Y%m%d")
-    return [
-        item for item in items
-        if parse_date(item) and start_dt <= parse_date(item) <= end_dt
-    ]
+    result = []
+    for item in items:
+        dt = parse_date(item)
+        if dt is None:
+            result.append(item)  # 날짜 파싱 실패해도 일단 포함
+        elif start_dt <= dt <= end_dt:
+            result.append(item)
+    return result
 
 
 # ============================
