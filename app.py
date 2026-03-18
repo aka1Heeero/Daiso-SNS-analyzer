@@ -208,14 +208,14 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 # 메인 UI
 # ============================
-st.title("🔍 네이버 리뷰 AI 감성분석기 by PC")
+st.title("🔍 네이버 리뷰 AI분석기 by PC")
 st.markdown("블로그·지식인 리뷰를 수집하고 AI로 감성을 자동 분석합니다.")
 st.divider()
 
 # 사이드바 설정
 with st.sidebar:
     st.header("Main")
-    query = st.text_input("🔎 검색어", value="다이소 상품 리뷰")
+    query = st.text_input("🔎 검색어", value="검색어를 입력하세요") ### 검색에서, 띄어쓰기를 반영하여 적용
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.text_input("시작일", value="20250101", help="YYYYMMDD 형식")
