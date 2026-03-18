@@ -11,7 +11,7 @@ from collections import Counter
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="네이버 리뷰 AI 감성분석기",
+    page_title="네이버 리뷰 AI분석기 By PC",
     page_icon="🔍",
     layout="wide"
 )
@@ -208,13 +208,13 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 # 메인 UI
 # ============================
-st.title("🔍 네이버 리뷰 AI 감성분석기")
+st.title("🔍 네이버 리뷰 AI 감성분석기 by PC")
 st.markdown("블로그·지식인 리뷰를 수집하고 AI로 감성을 자동 분석합니다.")
 st.divider()
 
 # 사이드바 설정
 with st.sidebar:
-    st.header("⚙️ 분석 설정")
+    st.header("Main")
     query = st.text_input("🔎 검색어", value="다이소 상품 리뷰")
     col1, col2 = st.columns(2)
     with col1:
