@@ -354,13 +354,13 @@ if run:
             all_items += b
             st.info(f"블로그 {len(b)}개")
         if do_kin:
-            k = search_naver(query, "kin", display_count)
-            all_items += k
-            st.info(f"지식인 {len(k)}개")
-            if k:
-            for item in k[:3]:
-               st.code(f"postdate: [{item.get('postdate', '없음')}] | pubDate: [{item.get('pubDate', '없음')}] | 전체키: {list(item.keys())}")
-
+    k = search_naver(query, "kin", display_count)
+    all_items += k
+    st.info(f"지식인 {len(k)}개")
+    # 임시 디버깅
+    if k:
+        for item in k[:3]:
+            st.code(f"postdate: [{item.get('postdate', '없음')}] | pubDate: [{item.get('pubDate', '없음')}] | 전체키: {list(item.keys())}")
     filtered = filter_by_date(all_items, start_date, end_date)
 
     # 날짜 디버깅 — 결과 0개일 때 원인 확인
