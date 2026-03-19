@@ -157,13 +157,26 @@ def filter_by_date(items, start, end):
 # ============================
 # AI 감성 분석 (ELECTRA 라벨 매핑)
 # ============================
+# 명백한 긍정/부정 표현 오버라이드
+POSITIVE_OVERRIDE = [
+    "꿀이었", "강추", "최고", "완벽", "대박", "굿", "좋았", "만족",
+    "추천", "좋아요", "훌륭", "짱", "최애", "득템", "필수템"
+]
+NEGATIVE_OVERRIDE = [
+    "최악", "환불", "불량품", "쓰레기", "망했", "최저", "형편없",
+    "절대비추", "비추", "후회", "실망"
+]
+
 def ai_sentiment(text, model):
     try:
+        if any(kw in text for kw in POSITIVE_OVERRIDE):
+            return "호평", 95.0
+        if any(kw in text for kw in NEGATIVE_OVERRIDE):
+            return "악평", 95.0
+
         result = model(text[:512])[0]
         label = result["label"].lower()
         score = round(result["score"] * 100, 1)
-
-        # koelectra-base-finetuned-sentiment 라벨: 0=부정, 1=긍정
         if label in ["positive", "1", "pos"]:
             return "호평", score
         elif label in ["negative", "0", "neg"]:
