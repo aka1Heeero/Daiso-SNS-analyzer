@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 19 13:36:04 2026
+
+@author: AD1501015P01
+"""
+
 import streamlit as st
 import requests
 import openpyxl
@@ -380,7 +387,7 @@ if len(filtered) == 0 and all_items:
     for item in all_items[:5]:
         st.code(f"출처: {item.get('출처')} | postdate: [{item.get('postdate','')}] | pubDate: [{item.get('pubDate','')}]")
 
-st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
+        st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
 
     brand, results, skipped = query.split()[0], [], 0
     prog = st.progress(0, text="분석 중...")
