@@ -3,7 +3,7 @@ import requests
 import openpyxl
 import re
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from transformers import pipeline
 from collections import Counter
 import pandas as pd
@@ -31,15 +31,18 @@ def check_password():
 if not check_password():
     st.stop()
 
+# ============================
+# API 키
+# ============================
 NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
-# 상품 사전
+# 상품 사전 (Secrets에서 관리)
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
-_default = []
+_default = []  # 기밀 상품명은 Secrets에서만 관리
 PRODUCT_DICT = sorted(set(_custom + _default), key=len, reverse=True)
 
 SYNONYM_DICT = {
@@ -73,7 +76,6 @@ PRODUCT_KEYWORDS = [
     "샀","구매","구입","제품","상품","사용","써봤","써보니",
     "개봉","사봤","가격","원짜리","원에","원인데","후기","리뷰"
 ]
-
 POSITIVE_CONTEXT = [
     "저렴해","싸다","착하다","알뜰","합리적","가성비좋","가성비최고",
     "저렴하네","싸네","가격이좋","저가","가격착해","가격이착해",
@@ -85,14 +87,12 @@ POSITIVE_CONTEXT = [
     "뮤지엄","박물관","미술관","해외","면세","백화점","마트보다",
     "편의점보다","온라인보다","다른곳보다","훨씬싸","비교불가",
     "대박","화악뛰","가격이화악","놀랍","신기해","이게이가격",
-    "이가격에","이런퀄리티","가격대비좋","믿기지않","믿기지않아"
-    
+    "이가격에","이런퀄리티","가격대비좋","믿기지않","믿기지않아",
 ]
 
 def is_complaint(text, brand):
     if "다이소" not in text:
         return False
-    # 명백한 칭찬/비교 글은 제외
     if any(kw in text for kw in POSITIVE_CONTEXT):
         return False
     return (any(kw in text for kw in PRODUCT_KEYWORDS)
@@ -242,15 +242,13 @@ MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
              "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
 
 def parse_date(item):
-    # 블로그: postdate = "20250317"
+    # 블로그/지식인 공통: postdate = "20250317"
     d = item.get("postdate", "").strip()
     if re.match(r'^\d{8}$', d):
-        try:
-            return datetime.strptime(d, "%Y%m%d")
-        except:
-            pass
+        try: return datetime.strptime(d, "%Y%m%d")
+        except: pass
 
-    # 지식인: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
+    # 지식인 일부: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
     d = item.get("pubDate", "").strip()
     if "," in d:
         try:
@@ -258,10 +256,8 @@ def parse_date(item):
             day   = int(parts[1])
             month = MONTH_MAP.get(parts[2], 0)
             year  = int(parts[3])
-            if month > 0:
-                return datetime(year, month, day)
-        except:
-            pass
+            if month > 0: return datetime(year, month, day)
+        except: pass
 
     return None
 
@@ -329,9 +325,13 @@ with st.sidebar:
         for s in suggestions: st.info(s)
         if not warnings and not suggestions: st.success("✅ 검색어 적절")
 
+    # 날짜 기본값: 오늘 기준 3개월 전 ~ 오늘
+    today = datetime.today()
+    three_months_ago = today - timedelta(days=90)
+
     c1, c2 = st.columns(2)
-    with c1: start_date = st.text_input("시작일", "20250101", help="YYYYMMDD")
-    with c2: end_date   = st.text_input("종료일",  "20260101", help="YYYYMMDD")
+    with c1: start_date = st.text_input("시작일", three_months_ago.strftime("%Y%m%d"), help="YYYYMMDD")
+    with c2: end_date   = st.text_input("종료일", today.strftime("%Y%m%d"), help="YYYYMMDD")
 
     st.markdown("**수집 채널**")
     do_blog = st.checkbox("블로그", value=True)
@@ -354,24 +354,15 @@ if run:
             all_items += b
             st.info(f"블로그 {len(b)}개")
         if do_kin:
-    k = search_naver(query, "kin", display_count)
-    all_items += k
-    st.info(f"지식인 {len(k)}개")
-    # 임시 디버깅
-    if k:
-        for item in k[:3]:
-            st.code(f"postdate: [{item.get('postdate', '없음')}] | pubDate: [{item.get('pubDate', '없음')}] | 전체키: {list(item.keys())}")
+            k = search_naver(query, "kin", display_count)
+            all_items += k
+            st.info(f"지식인 {len(k)}개")
+            # 지식인 날짜 필드 디버깅 (날짜 없을 때 확인용)
+            if k:
+                sample = k[0]
+                st.caption(f"🔍 지식인 날짜 필드 확인 — postdate: [{sample.get('postdate','없음')}] | pubDate: [{sample.get('pubDate','없음')}]")
+
     filtered = filter_by_date(all_items, start_date, end_date)
-
-    # 날짜 디버깅 — 결과 0개일 때 원인 확인
-    if len(filtered) == 0 and all_items:
-        st.warning("🔍 날짜 디버깅: 첫 5개 확인")
-        for item in all_items[:5]:
-            pd_val = item.get("postdate", "없음")
-            pub_val = item.get("pubDate", "없음")
-            dt = parse_date(item)
-            st.code(f"출처:{item.get('출처')} | postdate:[{pd_val}] | pubDate:[{pub_val}] | 파싱결과:{dt}")
-
     st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
     if not filtered: st.warning("해당 기간에 결과가 없습니다."); st.stop()
 
