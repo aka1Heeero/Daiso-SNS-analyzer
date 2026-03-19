@@ -72,7 +72,9 @@ SYNONYM_DICT = {
     "충전기":   ["어댑터","충전어댑터","멀티충전기"],
     "케이블":   ["충전선","USB선","C타입선","라이트닝"],
     "집게":     ["빨래집게","클립집게","자석집게"],
-    "지퍼백":   ["비닐백","보관백","냉동백"],
+    "지퍼백":   ["비닐백","보관백","냉동백"],    
+    "마우스":   ["무선마우스","유선마우스","블루투스마우스"],
+    "키보드":   ["무선키보드","유선키보드","블루투스키보드"],
 }
 
 # ============================
@@ -162,7 +164,7 @@ STOPWORDS = {
     "다이소","구매","후기","리뷰","사용","제품","상품","추천","가격","할인",
     "불만","불량","고장","파손","이거","저거","이것","저것","그것","여기","거기",
     "해당","관련","같은","어떤","이런","저런","그런","모든","일부","전체","보면","대한",
-    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인","자","마우스"
+    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인","자","마우스","무선","유선","감도","성능","기능"
 }
 
 def extract_product(text, brand="다이소"):
@@ -210,15 +212,15 @@ def search_naver(query, type_, display=100):
 def parse_date(item):
     d = item.get("postdate") or item.get("pubDate", "")
     if not d: return None
+    d = d.strip()
     try:
-        if len(d) == 8:
+        if re.match(r'^\d{8}$', d):
             return datetime.strptime(d, "%Y%m%d")
         elif "," in d:
-            # "Mon, 17 Mar 2025 00:00:00 +0900" 형식
             parts = d.split()
             if len(parts) >= 4:
                 return datetime.strptime(f"{parts[1]} {parts[2]} {parts[3]}", "%d %b %Y")
-        elif len(d) >= 10:
+        elif re.match(r'^\d{4}-\d{2}-\d{2}', d):
             return datetime.strptime(d[:10], "%Y-%m-%d")
     except:
         return None
