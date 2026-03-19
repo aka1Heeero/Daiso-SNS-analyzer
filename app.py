@@ -162,7 +162,7 @@ STOPWORDS = {
     "다이소","구매","후기","리뷰","사용","제품","상품","추천","가격","할인",
     "불만","불량","고장","파손","이거","저거","이것","저것","그것","여기","거기",
     "해당","관련","같은","어떤","이런","저런","그런","모든","일부","전체","보면","대한",
-    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인"
+    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인","자","마우스"
 }
 
 def extract_product(text, brand="다이소"):
@@ -211,15 +211,17 @@ def parse_date(item):
     d = item.get("postdate") or item.get("pubDate", "")
     if not d: return None
     try:
-        if len(d) == 8: return datetime.strptime(d, "%Y%m%d")
-        elif "," in d: return datetime.strptime(d[:22].strip(), "%a, %d %b %Y")
-        elif len(d) >= 10: return datetime.strptime(d[:10], "%Y-%m-%d")
+        if len(d) == 8:
+            return datetime.strptime(d, "%Y%m%d")
+        elif "," in d:
+            # "Mon, 17 Mar 2025 00:00:00 +0900" 형식
+            parts = d.split()
+            if len(parts) >= 4:
+                return datetime.strptime(f"{parts[1]} {parts[2]} {parts[3]}", "%d %b %Y")
+        elif len(d) >= 10:
+            return datetime.strptime(d[:10], "%Y-%m-%d")
     except:
-        try:
-            p = d.split()
-            if len(p) >= 4: return datetime.strptime(f"{p[1]} {p[2]} {p[3]}", "%d %b %Y")
-        except: pass
-    return None
+        return None
 
 def filter_by_date(items, start, end):
     s, e = datetime.strptime(start, "%Y%m%d"), datetime.strptime(end, "%Y%m%d")
