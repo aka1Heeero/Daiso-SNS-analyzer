@@ -45,7 +45,7 @@ NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
-# 상품 사전 (secrets에서 추가 가능)
+# 상품 사전 — secrets에서 추가 (코드 수정 불필요)
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
@@ -63,6 +63,27 @@ _default = [
     "청소포","밀대","빗자루","쓰레받기","위생봉투","쓰레기봉투"
 ]
 PRODUCT_DICT = sorted(set(_custom + _default), key=len, reverse=True)
+
+# ============================
+# 동의어 사전 — 여기를 계속 확장하면 정확도 올라감
+# ============================
+# 형식: "대표명": ["동의어1", "동의어2", ...]
+# 실제 데이터에서 못 잡힌 표현 발견하면 추가
+SYNONYM_DICT = {
+    "양말":     ["발목양말", "쿠션양말", "스포츠양말", "덧신", "발목"],
+    "텀블러":   ["보온병", "보냉병", "물통", "스텐컵"],
+    "수세미":   ["설거지솔", "수세미볼", "철수세미"],
+    "마스크팩": ["팩", "마스크시트", "시트팩"],
+    "바구니":   ["바스켓", "정리함", "수납함", "트레이"],
+    "케이스":   ["파우치", "보관함", "케이스"],
+    "행거":     ["옷걸이", "스탠드행거", "빨래걸이"],
+    "압축봉":   ["욕실봉", "샤워커튼봉", "수납봉"],
+    "매트":     ["발매트", "욕실매트", "미끄럼방지매트"],
+    "충전기":   ["어댑터", "충전어댑터", "멀티충전기"],
+    "케이블":   ["충전선", "USB선", "C타입선", "라이트닝"],
+    "집게":     ["빨래집게", "클립집게", "자석집게"],
+    "지퍼백":   ["비닐백", "보관백", "냉동백"],
+}
 
 # ============================
 # 1차: 불만 필터 키워드
@@ -89,33 +110,21 @@ def is_complaint(text, brand):
 # 검색어 적정성 검사
 # ============================
 def check_query(query):
-    """검색어가 분석 목적에 적합한지 확인"""
-    warnings = []
-    suggestions = []
-
-    # 브랜드명 확인
+    warnings, suggestions = [], []
     brand = query.split()[0]
     if len(brand) < 2:
         warnings.append("브랜드명이 너무 짧아요")
-
-    # 불만 키워드 포함 여부
     complaint_hints = ["불만","불량","후기","리뷰","문제","이상"]
-    has_hint = any(h in query for h in complaint_hints)
-    if not has_hint:
-        suggestions.append(f'💡 불만 관련 키워드 추가 추천: **"{brand} 불만"** 또는 **"{brand} 불량 후기"**')
-
-    # 너무 짧은 쿼리
+    if not any(h in query for h in complaint_hints):
+        suggestions.append(f'💡 불만 키워드 추가 추천: **"{brand} 불만"** 또는 **"{brand} 불량 후기"**')
     if len(query.strip()) < 4:
-        warnings.append("검색어가 너무 짧아요. 브랜드명 + 키워드 조합을 추천해요")
-
-    # 너무 긴 쿼리
+        warnings.append("검색어가 너무 짧아요")
     if len(query.strip()) > 20:
         warnings.append("검색어가 너무 길면 결과가 적을 수 있어요")
-
     return warnings, suggestions
 
 # ============================
-# 2차: AI 감성 분석
+# 2차: AI 감성 분석 — KR-ELECTRA-SC
 # ============================
 @st.cache_resource
 def load_model():
@@ -189,7 +198,7 @@ def classify_type(text):
     return ", ".join(matched[:2]) if matched else "기타불만"
 
 # ============================
-# 3차: 상품명 추출
+# 3차: 상품명 추출 (정확매칭 → 동의어 → 패턴)
 # ============================
 STOPWORDS = {
     "다이소","구매","후기","리뷰","사용","제품","상품","추천",
@@ -200,15 +209,27 @@ STOPWORDS = {
 }
 
 def extract_product(text, brand="다이소"):
+    # 1순위: 사전 직접 매칭 (긴 단어 우선)
     for p in PRODUCT_DICT:
         if p in text:
             return p
+
+    # 2순위: 동의어 매칭 → 대표명으로 통일
+    for key, synonyms in SYNONYM_DICT.items():
+        for s in synonyms:
+            if s in text:
+                return key
+
+    # 3순위: 브랜드명 뒤 명사
     m = re.search(rf'{brand}\s+([가-힣]{{2,8}})(?=\s|$|[이을를의은는가])', text)
     if m and m.group(1) not in STOPWORDS:
         return m.group(1)
+
+    # 4순위: "X 후기/불량/불만" 앞 명사
     m = re.search(r'([가-힣]{2,8})\s+(?:후기|리뷰|불량|파손|고장|불만)(?:\s|$|[이을를])', text)
     if m and m.group(1) not in STOPWORDS:
         return m.group(1)
+
     return ""
 
 def extract_info(text):
@@ -287,70 +308,59 @@ def create_excel(data, query, start_date, end_date):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "AI 불만 분석"
-
-    # ★ 태깅 컬럼 추가: 마지막에 "불만여부(태깅)" 컬럼
     headers = [
         "출처","품명","품번","가격","제목","링크","날짜",
-        "감성","확신도(%)","불만유형",
-        "불만여부(태깅)"  # ← 여기에 1 또는 0 입력
+        "감성","확신도(%)","불만유형","불만여부(태깅)"
     ]
     ws.append(headers)
-
-    # 헤더 스타일
     for col in range(1, len(headers)+1):
         ws.cell(1, col).font = openpyxl.styles.Font(bold=True)
         ws.cell(1, col).fill = openpyxl.styles.PatternFill(
             start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
-
-    # 태깅 컬럼 헤더는 노란색으로 강조
     ws.cell(1, 11).fill = openpyxl.styles.PatternFill(
         start_color="FFD700", end_color="FFD700", fill_type="solid")
-    ws.cell(1, 11).font = openpyxl.styles.Font(bold=True, color="000000")
 
     s_colors = {"호평":"C6EFCE","악평":"FFC7CE","중립":"FFEB9C","분석불가":"D9D9D9"}
     t_colors = {
         "품질불량":"FCE4D6","안전성":"FFE0E0","스펙불일치":"EAF0FB",
         "내구성":"FFF2CC","구매경험":"E2EFDA","가성비":"F0E6FF","기타불만":"F2F2F2"
     }
-
     for ri, r in enumerate(data, 2):
         ws.append([
-            r["출처"], r["품명"], r["품번"], r["가격"],
-            r["title"], r["link"], r["날짜"],
-            r["감성"], r["확신도"], r["불만유형"],
-            ""  # 태깅 컬럼 빈칸 (사용자가 1 또는 0 입력)
+            r["출처"],r["품명"],r["품번"],r["가격"],
+            r["title"],r["link"],r["날짜"],
+            r["감성"],r["확신도"],r["불만유형"],""
         ])
-        ws.cell(ri, 8).fill = openpyxl.styles.PatternFill(
+        ws.cell(ri,8).fill = openpyxl.styles.PatternFill(
             start_color=s_colors.get(r["감성"],"FFFFFF"),
             end_color=s_colors.get(r["감성"],"FFFFFF"), fill_type="solid")
         first_type = r["불만유형"].split(",")[0].strip()
-        ws.cell(ri, 10).fill = openpyxl.styles.PatternFill(
+        ws.cell(ri,10).fill = openpyxl.styles.PatternFill(
             start_color=t_colors.get(first_type,"F2F2F2"),
             end_color=t_colors.get(first_type,"F2F2F2"), fill_type="solid")
-        # 태깅 컬럼 연한 노란색 배경
-        ws.cell(ri, 11).fill = openpyxl.styles.PatternFill(
+        ws.cell(ri,11).fill = openpyxl.styles.PatternFill(
             start_color="FFFDE7", end_color="FFFDE7", fill_type="solid")
 
-    # 태깅 안내 시트 추가
+    # 태깅 안내 시트
     ws2 = wb.create_sheet("📌 태깅 안내")
-    ws2.append(["태깅 방법 안내"])
-    ws2.append([])
-    ws2.append(["목적", "AI 파인튜닝용 학습 데이터 수집"])
-    ws2.append(["방법", "'불만여부(태깅)' 컬럼에 아래 값을 입력하세요"])
-    ws2.append([])
-    ws2.append(["입력값", "의미", "예시"])
-    ws2.append(["1", "실제 불만글 (학습에 사용)", "텀블러 뚜껑 깨짐 환불요청"])
-    ws2.append(["0", "불만 아닌 글 (학습에 사용)", "다이소 어디서 파나요?"])
-    ws2.append(["빈칸", "확인 안 함 (학습에 미사용)", ""])
-    ws2.append([])
-    ws2.append(["목표", "1과 0을 합쳐서 200개 이상 모으면 파인튜닝 가능"])
-    ws2.append(["팁", "전부 태깅 안 해도 됩니다. 확실한 것만 해주세요"])
-    ws2.column_dimensions["A"].width = 20
-    ws2.column_dimensions["B"].width = 40
-    ws2.column_dimensions["C"].width = 40
+    ws2["A1"] = "태깅 방법 안내"
     ws2["A1"].font = openpyxl.styles.Font(bold=True, size=14)
+    rows = [
+        [], ["목적","AI 파인튜닝용 학습 데이터 수집"],
+        [], ["입력값","의미","예시"],
+        ["1","실제 불만글","텀블러 뚜껑 깨짐 환불요청"],
+        ["0","불만 아닌 글","다이소 어디서 파나요?"],
+        ["빈칸","확인 안 함 (미사용)",""],
+        [], ["목표","1+0 합쳐서 200개 이상 → 파인튜닝 가능"],
+        ["팁","확실한 것만 태깅해도 됩니다"],
+    ]
+    for row in rows:
+        ws2.append(row)
+    ws2.column_dimensions["A"].width = 15
+    ws2.column_dimensions["B"].width = 35
+    ws2.column_dimensions["C"].width = 40
 
-    for col, w in zip("ABCDEFGHIJK", [10,18,14,14,40,48,12,10,10,20,16]):
+    for col, w in zip("ABCDEFGHIJK",[10,18,14,14,40,48,12,10,10,20,16]):
         ws.column_dimensions[col].width = w
 
     buf = io.BytesIO()
@@ -368,10 +378,9 @@ st.divider()
 
 with st.sidebar:
     st.header("⚙️ 분석 설정")
-
     query = st.text_input("🔎 검색어 (브랜드명 포함)", value="다이소 상품 불만")
 
-    # ② 검색어 적정성 실시간 체크
+    # 검색어 적정성 체크
     if query:
         warnings, suggestions = check_query(query)
         for w in warnings:
@@ -391,31 +400,53 @@ with st.sidebar:
     st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
     display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
 
-    # ③ 상품 사전 안내
     st.divider()
-    with st.expander("📦 상품 사전이란?"):
+
+    # 정확도 업그레이드 가이드
+    with st.expander("📈 정확도 올리는 방법"):
         st.markdown("""
-**상품 사전**은 AI가 글에서 상품명을 찾아낼 때 참고하는 단어 목록이에요.
-
-예를 들어 *"다이소 텀블러 뚜껑이 깨졌어요"* 라는 글에서
-→ **텀블러** 를 상품명으로 인식하는 것이 상품 사전 덕분이에요.
-
-**현재 등록된 상품 수:** """ + f"`{len(PRODUCT_DICT)}개`" + """
-
-**상품 추가 방법:**
-Streamlit Cloud → 앱 설정 → Secrets 에서
+**1️⃣ 상품명 추가** (가장 기본)
+> Streamlit Cloud → Secrets 에서:
 ```
-DAISO_PRODUCTS = "신제품명1, 신제품명2"
+DAISO_PRODUCTS = "발목양말,쿨링티셔츠,나일론팬츠"
 ```
-를 추가하면 코드 수정 없이 바로 반영돼요.
+코드 수정 없이 바로 반영돼요.
+
+---
+
+**2️⃣ 동의어 추가** (더 중요)
+> `app.py` 의 `SYNONYM_DICT` 에 추가:
+```python
+SYNONYM_DICT = {
+    "양말": ["발목양말","쿠션양말","덧신"],
+    "텀블러": ["보온병","물통","스텐컵"],
+}
+```
+동의어로 불리는 상품을 하나의 대표명으로 통일해줘요.
+
+---
+
+**3️⃣ 불만 키워드 추가**
+> `app.py` 의 `COMPLAINT_KEYWORDS` 에 추가:
+```python
+COMPLAINT_KEYWORDS = [
+    ...,
+    "내가추가한불만표현","새로운욕설표현"
+]
+```
+실제 데이터에서 놓친 표현 발견하면 바로 추가하세요.
+
+---
+
+**4️⃣ 태깅 → 파인튜닝** (최종 단계)
+엑셀 다운 후 `불만여부(태깅)` 컬럼에
+불만글 = **1**, 일반글 = **0** 입력.
+200개 이상 모이면 AI 직접 학습 가능.
         """)
-        # 현재 사전 목록 보여주기
-        if st.checkbox("현재 상품 목록 보기"):
-            st.write(", ".join(sorted(PRODUCT_DICT)))
 
     st.divider()
     st.markdown("**🎯 감성 키워드 직접 추가**")
-    st.caption("AI가 놓치는 표현을 직접 입력 (쉼표 구분)")
+    st.caption("쉼표로 구분해서 입력")
     extra_pos_txt = st.text_area("✅ 호평 키워드", "꿀템, 완전좋아", height=60)
     extra_neg_txt = st.text_area("❌ 악평 키워드", "진짜별로, 돈낭비", height=60)
 
@@ -556,12 +587,8 @@ if run:
     </tr></thead><tbody>{rows_html}</tbody></table></div>
     """, unsafe_allow_html=True)
 
-    # ① 엑셀 다운로드 — 태깅 안내 포함
     st.subheader("💾 결과 다운로드")
-    st.info("""📌 **엑셀에 태깅 컬럼이 포함되어 있어요!**
-다운로드 후 **'불만여부(태깅)'** 컬럼에 → 실제 불만글이면 **1**, 아니면 **0** 입력
-200개 이상 모이면 AI 파인튜닝에 활용할 수 있어요. **'📌 태깅 안내' 시트**를 참고하세요.""")
-
+    st.info("📌 엑셀의 **'불만여부(태깅)'** 컬럼에 불만글=**1**, 일반글=**0** 입력 → 200개 모이면 AI 파인튜닝 가능")
     excel_buf = create_excel(results, query, start_date, end_date)
     st.download_button(
         "📥 엑셀 다운로드 (태깅 컬럼 포함)", data=excel_buf,
