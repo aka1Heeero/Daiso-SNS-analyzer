@@ -114,7 +114,7 @@ def check_query(query):
 # ============================
 @st.cache_resource
 def load_model():
-    return pipeline("sentiment-analysis", model="snunlp/KR-ELECTRA-SC",
+    return pipeline("sentiment-analysis", model="snunlp/KR-FinBert-SC",
                     truncation=True, max_length=512)
 
 DEFAULT_POSITIVE = [
