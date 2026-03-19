@@ -73,7 +73,7 @@ def is_relevant(text, brand):
 # ============================
 @st.cache_resource
 def load_model():
-    # KR-FinBERT보다 더 빠르고 정확한 ELECTRA 기반 한국어 감성분석 모델
+    # KR-ELECTRA 기반 한국어 감성분석 모델
     return pipeline(
         "sentiment-analysis",
         model="monologg/koelectra-base-finetuned-sentiment",
@@ -247,7 +247,7 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 st.title("🤬 네이버 고객품질불만 AI분석기 by PC")
 st.markdown("블로그·지식인에서 **불만 후기만** 수집하고 AI로 감성을 자동 분석합니다.")
-st.caption("🤖 AI 모델: monologg/koelectra-base-finetuned-sentiment (KoELECTRA 기반 한국어 감성분석)")
+st.caption("🤖 AI 모델: koelectra-base-finetuned-sentiment")
 st.divider()
 
 with st.sidebar:
