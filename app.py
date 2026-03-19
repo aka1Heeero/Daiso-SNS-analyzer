@@ -223,8 +223,8 @@ def create_excel(data, query, start_date, end_date):
 # UI
 # ============================
 st.title("🤬 네이버 고객불만 AI 분석기 by PC")
-st.markdown("블로그·지식인 **불만 후기만** 수집 → AI 감성분석 → 불만유형 자동분류")
-st.caption("🤖 KR-ELECTRA-SC  |  1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
+st.markdown("네이버 블로그·지식인 **불만 후기** 수집 및 AI분석")
+st.caption("🤖 KR-ELECTRA-SC model 사용")
 st.divider()
 
 with st.sidebar:
@@ -246,22 +246,9 @@ with st.sidebar:
     do_kin  = st.checkbox("지식인", value=True)
     st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
     display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
-
-    st.divider()
-    st.markdown("**📦 상품명 추가**")
-    st.caption("사전에 없는 상품명 입력 (쉼표 구분)")
-    extra_products_txt = st.text_area("상품명", placeholder="예: 쿨링티셔츠, 나일론팬츠, 아이스팩", height=70, label_visibility="collapsed")
-
-    st.divider()
-    st.markdown("**🚨 불만 키워드 추가**")
-    st.caption("AI가 못 잡는 불만 표현 입력 (쉼표 구분)")
-    extra_complaint_txt = st.text_area("불만키워드", placeholder="예: 너무별로, 완전구림, 다시는안삼", height=70, label_visibility="collapsed")
-
+  
     st.divider()
     run = st.button("🐎 분석 시작", use_container_width=True, type="primary")
-
-extra_products  = [p.strip() for p in extra_products_txt.split(",") if p.strip()]
-extra_complaints= [k.strip() for k in extra_complaint_txt.split(",") if k.strip()]
 
 PRODUCT_DICT = sorted(set(_secret_products + _default + extra_products), key=len, reverse=True)
 COMPLAINT_KEYWORDS = DEFAULT_COMPLAINT_KEYWORDS + extra_complaints
