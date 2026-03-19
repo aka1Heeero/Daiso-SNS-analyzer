@@ -42,7 +42,7 @@ NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
-_default = []  # 기밀 상품명은 Secrets에서만 관리
+_default = []
 PRODUCT_DICT = sorted(set(_custom + _default), key=len, reverse=True)
 
 SYNONYM_DICT = {
@@ -60,6 +60,15 @@ SYNONYM_DICT = {
     "가습기":   ["초음파가습기","미니가습기","가열식가습기"],
     "젤램프":   ["젤네일램프","UV램프","LED램프","네일램프"],
     "전구":     ["LED전구","형광등","야간등"],
+}
+
+# ============================
+# 출처 매핑
+# ============================
+SOURCE_MAP = {
+    "blog":        "블로그",
+    "kin":         "지식인",
+    "cafearticle": "카페글",
 }
 
 # ============================
@@ -106,7 +115,7 @@ def check_query(query):
     if not any(h in query for h in ["불만","불량","후기","리뷰","문제","이상"]):
         suggestions.append('💡 추천: **"다이소 불만"** 또는 **"다이소 불량 후기"**')
     if len(query.strip()) > 20:
-        warnings.append("검색어가 너무 길면 결과가 적을 수 있어요")
+        warnings.append("검색어가 길면 검색이 안됩니다")
     return warnings, suggestions
 
 # ============================
@@ -228,7 +237,7 @@ def search_naver(query, type_, display=100):
             batch = res.json().get("items", [])
             if not batch: break
             for item in batch:
-                item["출처"] = "블로그" if type_ == "blog" else "지식인"
+                item["출처"] = SOURCE_MAP.get(type_, type_)
             items += batch
         except Exception as e:
             st.warning(f"수집 오류: {e}"); break
@@ -242,13 +251,13 @@ MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
              "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
 
 def parse_date(item):
-    # 블로그/지식인 공통: postdate = "20250317"
+    # 블로그: postdate = "20250317"
     d = item.get("postdate", "").strip()
     if re.match(r'^\d{8}$', d):
         try: return datetime.strptime(d, "%Y%m%d")
         except: pass
 
-    # 지식인 일부: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
+    # 카페글: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
     d = item.get("pubDate", "").strip()
     if "," in d:
         try:
@@ -265,6 +274,10 @@ def filter_by_date(items, start, end):
     s, e = datetime.strptime(start, "%Y%m%d"), datetime.strptime(end, "%Y%m%d")
     result = []
     for item in items:
+        # 지식인은 날짜 API 미제공 → 무조건 포함
+        if item.get("출처") == "지식인":
+            result.append(item)
+            continue
         dt = parse_date(item)
         if dt is None or s <= dt <= e:
             result.append(item)
@@ -308,9 +321,9 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 # 메인 UI
 # ============================
-st.title("🤬 네이버 고객불만 AI 분석기 by PC")
-st.markdown("블로그·지식인 **불만 후기만** 수집 → AI 감성분석 → 불만유형 자동분류")
-st.caption("🤖 KR-FinBert-SC  |  1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
+st.title("🤬다이소 고객 불만 AI 분석기 by PC")
+st.markdown("블로그·지식인·카페 **품질 불만** 수집 → AI 감성분석 → 불만유형 자동분류")
+st.caption("🤖 KR-FinBert-SC Model 활용 by Free")
 st.divider()
 
 with st.sidebar:
@@ -325,10 +338,8 @@ with st.sidebar:
         for s in suggestions: st.info(s)
         if not warnings and not suggestions: st.success("✅ 검색어 적절")
 
-    # 날짜 기본값: 오늘 기준 3개월 전 ~ 오늘
     today = datetime.today()
     three_months_ago = today - timedelta(days=90)
-
     c1, c2 = st.columns(2)
     with c1: start_date = st.text_input("시작일", three_months_ago.strftime("%Y%m%d"), help="YYYYMMDD")
     with c2: end_date   = st.text_input("종료일", today.strftime("%Y%m%d"), help="YYYYMMDD")
@@ -336,6 +347,7 @@ with st.sidebar:
     st.markdown("**수집 채널**")
     do_blog = st.checkbox("블로그", value=True)
     do_kin  = st.checkbox("지식인", value=True)
+    do_cafe = st.checkbox("카페글", value=True)
     st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
     display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
     st.divider()
@@ -343,7 +355,7 @@ with st.sidebar:
 
 if run:
     if not query: st.error("검색어를 입력하세요"); st.stop()
-    if not do_blog and not do_kin: st.error("채널을 하나 이상 선택하세요"); st.stop()
+    if not do_blog and not do_kin and not do_cafe: st.error("채널을 하나 이상 선택하세요"); st.stop()
 
     with st.spinner("🤖 AI 모델 로딩 중..."): model = load_model()
 
@@ -357,13 +369,13 @@ if run:
             k = search_naver(query, "kin", display_count)
             all_items += k
             st.info(f"지식인 {len(k)}개")
-            # 지식인 날짜 필드 디버깅 (날짜 없을 때 확인용)
-            if k:
-                sample = k[0]
-                st.caption(f"🔍 지식인 날짜 필드 확인 — postdate: [{sample.get('postdate','없음')}] | pubDate: [{sample.get('pubDate','없음')}]")
+        if do_cafe:
+            c = search_naver(query, "cafearticle", display_count)
+            all_items += c
+            st.info(f"카페글 {len(c)}개")
 
     filtered = filter_by_date(all_items, start_date, end_date)
-    st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
+    st.write(f"📅 날짜 필터 후: **{len(filtered)}개** (지식인 API는 날짜구분 없음)")
     if not filtered: st.warning("해당 기간에 결과가 없습니다."); st.stop()
 
     brand, results, skipped = query.split()[0], [], 0
