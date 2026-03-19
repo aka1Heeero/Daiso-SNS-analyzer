@@ -126,11 +126,18 @@ def parse_date(item):
         if len(date_str) == 8:
             return datetime.strptime(date_str, "%Y%m%d")
         elif "," in date_str:
-            return datetime.strptime(date_str[:16], "%a, %d %b %Y")
+            # 지식인: "Mon, 17 Mar 2025 00:00:00 +0900"
+            return datetime.strptime(date_str[:22].strip(), "%a, %d %b %Y")
         elif len(date_str) >= 10:
             return datetime.strptime(date_str[:10], "%Y-%m-%d")
     except:
-        return None
+        try:
+            # 한 번 더 시도 — 공백 기준으로 날짜만 추출
+            parts = date_str.split()
+            if len(parts) >= 4:
+                return datetime.strptime(f"{parts[1]} {parts[2]} {parts[3]}", "%d %b %Y")
+        except:
+            return None
 
 # ============================
 # 날짜 필터링
@@ -170,29 +177,34 @@ def ai_sentiment(text, model):
 # 품번 / 품명 / 가격 추출
 # ============================
 def extract_product_info(text, query_brand="다이소"):
-    # 품번: 5~10자리 연속 숫자 (가격 숫자 제외)
-    code_pattern = r'(?<!\d)\d{5,10}(?!\d)(?!원)'
-    codes = [c for c in re.findall(code_pattern, text)
-             if not text[text.find(c):text.find(c)+len(c)+1].endswith("원")]
+    # 품번: 5~10자리 숫자, 단 앞뒤로 다른 숫자 없고 "원" 안 붙은 것만
+    code_pattern = r'(?<![0-9,])\b\d{5,10}\b(?![\d,]*원)'
+    codes = re.findall(code_pattern, text)
 
     # 가격 패턴
     price_pattern = r'\d{1,3}(?:,\d{3})*원'
     prices = re.findall(price_pattern, text)
 
-    # 품명: 불만/후기/리뷰/사용 앞에 오는 한글 명사
-    name_pattern = r'([가-힣]{2,10})\s*(?:불만|불량|파손|고장|후기|리뷰|사용기|사용|제품|상품)'
-    names = re.findall(name_pattern, text)
-
-    # 브랜드명 뒤에 오는 품명
-    brand_pattern = rf'{query_brand}\s+([가-힣]{{2,10}})'
+    # 품명: 브랜드명 바로 뒤에 오는 2~8자 한글 명사만
+    brand_pattern = rf'{query_brand}\s+([가-힣]{{2,8}})(?:\s|$|이|을|를|의|은|는|이|가)'
     brand_names = re.findall(brand_pattern, text)
 
+    # 품명: "X 후기/리뷰/불량" 패턴에서 추출 (단, 조사/부사 제외)
+    name_pattern = r'([가-힣]{2,8})\s+(?:후기|리뷰|불량|파손|고장|불만)'
+    names = re.findall(name_pattern, text)
+
+    # 불필요한 단어 제거 (stopwords 대폭 확장)
     stopwords = {
-        query_brand, "다이소", "구매", "후기", "리뷰", "사용", "제품",
-        "상품", "추천", "가격", "할인", "불만", "불량", "고장", "파손"
+        query_brand, "다이소", "구매", "후기", "리뷰", "사용", "제품", "상품",
+        "추천", "가격", "할인", "불만", "불량", "고장", "파손", "이거", "저거",
+        "이것", "저것", "그것", "여기", "거기", "해당", "관련", "내에서",
+        "같은", "어떤", "이런", "저런", "그런", "모든", "일부", "전체",
+        "한국", "일본", "중국", "온라인", "오프라인", "매장", "지점",
+        "소비자", "발명가", "기업들", "네트망", "커뮤니티", "배송에서",
+        "눈여겨", "여행사", "패키지", "자유여행",
     }
     all_names = [n for n in list(dict.fromkeys(brand_names + names))
-                 if n not in stopwords][:3]
+                 if n not in stopwords and len(n) >= 2][:3]
 
     return {
         "품번": ", ".join(list(dict.fromkeys(codes))[:3]) if codes else "",
@@ -273,7 +285,7 @@ if run_btn:
         st.error("블로그 또는 지식인 중 하나는 선택해주세요!")
         st.stop()
 
-    with st.spinner("🤖 AI 모델 로딩 및 분석중입니다...)"):
+    with st.spinner("🤖 AI 모델 로딩 및 분석중입니다............................"):
         sentiment_model = load_model()
 
     all_items = []
