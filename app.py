@@ -280,12 +280,6 @@ with st.sidebar:
 
     st.markdown("**🔎 검색어**")
     st.caption("검색어를 입력하세요")
-    st.markdown("""
-| 목적 | 검색어 예시 |
-|------|-----------|
-| 특정 상품 | `다이소 텀블러 불량` |
-| 특정 유형 | `다이소 환불 불편` |
-""")
     query = st.text_input("검색어 입력", value="다이소 불만", label_visibility="collapsed")
 
     if query:
