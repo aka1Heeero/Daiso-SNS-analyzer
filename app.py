@@ -252,7 +252,7 @@ st.divider()
 
 with st.sidebar:
     st.header("⚙️ 분석 설정")
-    query = st.text_input("🔎 검색어 (브랜드명 포함)", value="다이소 상품 불만")
+    query = st.text_input("🔎 검색어 (다이소 포함)", value="다이소 상품 불만")
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.text_input("시작일", value="20250101", help="YYYYMMDD 형식")
@@ -273,7 +273,7 @@ if run_btn:
         st.error("블로그 또는 지식인 중 하나는 선택해주세요!")
         st.stop()
 
-    with st.spinner("🤖 AI 모델 로딩 중... (처음 실행 시 1~2분 소요)"):
+    with st.spinner("🤖 AI 모델 로딩 및 분석중입니다...)"):
         sentiment_model = load_model()
 
     all_items = []
