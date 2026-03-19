@@ -373,8 +373,14 @@ if run:
             k = search_naver(query, "kin", display_count); all_items += k; st.info(f"지식인 {len(k)}개")
 
     filtered = filter_by_date(all_items, start_date, end_date)
-    st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
-    if not filtered: st.warning("해당 기간에 결과가 없습니다."); st.stop()
+
+   # ← 여기에 추가
+if len(filtered) == 0 and all_items:
+    st.warning("🔍 디버깅: 첫 5개 날짜 필드 확인")
+    for item in all_items[:5]:
+        st.code(f"출처: {item.get('출처')} | postdate: [{item.get('postdate','')}] | pubDate: [{item.get('pubDate','')}]")
+
+st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
 
     brand, results, skipped = query.split()[0], [], 0
     prog = st.progress(0, text="분석 중...")
