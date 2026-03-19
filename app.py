@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Mar 19 13:36:04 2026
-
-@author: AD1501015P01
-"""
-
 import streamlit as st
 import requests
 import openpyxl
@@ -42,7 +35,7 @@ NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
-# 상품 사전 (Secrets에서 추가 가능)
+# 상품 사전
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
@@ -160,64 +153,44 @@ def classify_type(text):
 # ============================
 # 3차: 상품명 추출
 # ============================
-# 품명으로 절대 쓰면 안 되는 단어 목록
 STOPWORDS = {
-    # 브랜드/플랫폼
     "다이소","네이버","블로그","지식인","카카오","쿠팡","이마트","온라인","오프라인",
-    # 조사/부사/대명사
     "자","은","는","이","가","을","를","의","에","도","만","로","으로","에서","에게",
     "이것","저것","그것","이거","저거","그거","여기","저기","거기","이곳","저곳",
-    # 일반 명사 (품명 아닌 것)
     "구매","후기","리뷰","사용","제품","상품","추천","가격","할인","불만","불량",
     "고장","파손","해당","관련","같은","어떤","이런","저런","그런","모든","일부","전체",
     "보면","대한","위한","통해","따라","방법","질문","문의","안내","설명","확인",
     "손님","진상","거기에","영양제","신문","기사","쿠폰","소송","대응","피고","원고",
-    "회복","민생","카오","페이","소비자","발명가","기업","브랜드","매장","지점",
-    "상품은","제품은","거기는","이것은","저것은","그것은",
-    # 속성어 (품명 아님)
+    "회복","민생","소비자","발명가","기업","브랜드","매장","지점",
+    "자체","빠지는데","등에서","접촉","슈얼리","물건","교환","환불",
     "무선","유선","감도","속도","성능","기능","구조","방식","형태","종류","색상",
     "크기","사이즈","용량","무게","두께","길이","너비","높이",
-    # 짧은 단어 필터 (1글자)
-    "자","기","것","수","때","곳","점","집","법","식","형","용","급","형","판",
 }
 
 def extract_product(text, brand="다이소"):
-    # 1순위: 사전 직접 매칭 (긴 단어 우선)
     for p in PRODUCT_DICT:
-        if p in text:
-            return p
-
-    # 2순위: 동의어 매칭
+        if p in text: return p
     for key, synonyms in SYNONYM_DICT.items():
         for s in synonyms:
-            if s in text:
-                return key
-
-    # 3순위: "다이소 X" 패턴 — 조사 없는 명사만 (2글자 이상, 순수 한글)
+            if s in text: return key
     m = re.search(r'다이소\s+([가-힣]{2,8})(?=[^가-힣]|$)', text)
     if m:
         candidate = m.group(1)
         if candidate not in STOPWORDS and len(candidate) >= 2:
             return candidate
-
-    # 4순위: "X 불량/후기/고장" 패턴 — 순수 한글 명사만
     m = re.search(r'([가-힣]{2,8})\s+(?:불량|파손|고장|후기|리뷰)(?:\s|$)', text)
     if m:
         candidate = m.group(1)
         if candidate not in STOPWORDS and len(candidate) >= 2:
             return candidate
-
     return ""
 
 # ============================
 # 품번 / 가격 추출
 # ============================
 def extract_info(text):
-    # 가격: 숫자+원 패턴, 단 000원 같은 HTML 잔여물 제외
     prices = re.findall(r'[1-9]\d{0,2}(?:,\d{3})*원', text)
-    # 품번: 5~10자리 숫자, 가격 아닌 것
     codes = re.findall(r'(?<![0-9,])\b[1-9]\d{4,9}\b(?![0-9])', text)
-    # 가격으로 잡힌 숫자는 품번에서 제외
     price_nums = [re.sub(r'[,원]', '', p) for p in prices]
     codes = [c for c in codes if c not in price_nums]
     return {
@@ -226,12 +199,12 @@ def extract_info(text):
     }
 
 # ============================
-# 텍스트 정제 (HTML 태그 + 특수문자 제거)
+# 텍스트 정제
 # ============================
 def clean_text(text):
-    text = re.sub(r'<[^>]+>', ' ', text)   # HTML 태그 제거
-    text = re.sub(r'&[a-z]+;', ' ', text)  # HTML 엔티티 제거 (&amp; 등)
-    text = re.sub(r'\s+', ' ', text)       # 연속 공백 정리
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'&[a-z]+;', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 # ============================
@@ -258,7 +231,7 @@ def search_naver(query, type_, display=100):
     return items
 
 # ============================
-# 날짜 파싱 (블로그 + 지식인 모두 처리)
+# 날짜 파싱
 # ============================
 MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
              "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
@@ -295,7 +268,6 @@ def filter_by_date(items, start, end):
         if dt is None or s <= dt <= e:
             result.append(item)
     return result
-    
 
 # ============================
 # 엑셀 생성
@@ -342,9 +314,15 @@ st.divider()
 
 with st.sidebar:
     st.header("⚙️ 분석 설정")
-
     st.markdown("**🔎 검색어**")
     st.caption("브랜드 + 상품명 + 불만키워드 조합")
+    st.markdown("""
+| 목적 | 예시 |
+|------|------|
+| 전체 불만 | `다이소 불만` |
+| 특정 상품 | `다이소 텀블러 불량` |
+| 특정 유형 | `다이소 환불 불편` |
+""")
     query = st.text_input("검색어 입력", value="다이소 불만", label_visibility="collapsed")
 
     if query:
@@ -361,7 +339,6 @@ with st.sidebar:
     do_blog = st.checkbox("블로그", value=True)
     do_kin  = st.checkbox("지식인", value=True)
     st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
-
     display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
     st.divider()
     run = st.button("🐎 분석 시작", use_container_width=True, type="primary")
@@ -375,19 +352,27 @@ if run:
     all_items = []
     with st.spinner("📡 수집 중..."):
         if do_blog:
-            b = search_naver(query, "blog", display_count); all_items += b; st.info(f"블로그 {len(b)}개")
+            b = search_naver(query, "blog", display_count)
+            all_items += b
+            st.info(f"블로그 {len(b)}개")
         if do_kin:
-            k = search_naver(query, "kin", display_count); all_items += k; st.info(f"지식인 {len(k)}개")
+            k = search_naver(query, "kin", display_count)
+            all_items += k
+            st.info(f"지식인 {len(k)}개")
 
     filtered = filter_by_date(all_items, start_date, end_date)
 
-   # ← 여기에 추가
-if len(filtered) == 0 and all_items:
-    st.warning("🔍 디버깅: 첫 5개 날짜 필드 확인")
-    for item in all_items[:5]:
-        st.code(f"출처: {item.get('출처')} | postdate: [{item.get('postdate','')}] | pubDate: [{item.get('pubDate','')}]")
+    # 날짜 디버깅 — 결과 0개일 때 원인 확인
+    if len(filtered) == 0 and all_items:
+        st.warning("🔍 날짜 디버깅: 첫 5개 확인")
+        for item in all_items[:5]:
+            pd_val = item.get("postdate", "없음")
+            pub_val = item.get("pubDate", "없음")
+            dt = parse_date(item)
+            st.code(f"출처:{item.get('출처')} | postdate:[{pd_val}] | pubDate:[{pub_val}] | 파싱결과:{dt}")
 
-        st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
+    st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
+    if not filtered: st.warning("해당 기간에 결과가 없습니다."); st.stop()
 
     brand, results, skipped = query.split()[0], [], 0
     prog = st.progress(0, text="분석 중...")
@@ -495,4 +480,3 @@ if len(filtered) == 0 and all_items:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
-
