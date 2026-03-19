@@ -286,7 +286,7 @@ with st.sidebar:
         warnings, suggestions = check_query(query)
         for w in warnings: st.warning(f"⚠️ {w}")
         for s in suggestions: st.info(s)
-        if not warnings and not suggestions: st.success("✅ 검색어 적절")
+        if not warnings and not suggestions: st.success("✅ 검색 가능")
 
     c1, c2 = st.columns(2)
     with c1: start_date = st.text_input("시작일", "20250101", help="YYYYMMDD")
