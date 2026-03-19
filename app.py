@@ -358,8 +358,8 @@ if run:
             all_items += k
             st.info(f"지식인 {len(k)}개")
             if k:
-            for item in k[:3]:
-            st.code(f"postdate: [{item.get('postdate', '없음')}] | pubDate: [{item.get('pubDate', '없음')}] | 전체키: {list(item.keys())}")
+              for item in k[:3]:
+              st.code(f"postdate: [{item.get('postdate', '없음')}] | pubDate: [{item.get('pubDate', '없음')}] | 전체키: {list(item.keys())}")
 
     filtered = filter_by_date(all_items, start_date, end_date)
 
