@@ -93,8 +93,10 @@ PRODUCT_KEYWORDS = [
 ]
 
 def is_complaint(text, brand):
-    return (brand.lower() in text.lower()
-            and any(kw in text for kw in PRODUCT_KEYWORDS)
+    # 다이소는 무조건 포함되어야 함
+    if "다이소" not in text:
+        return False
+    return (any(kw in text for kw in PRODUCT_KEYWORDS)
             and any(kw in text for kw in COMPLAINT_KEYWORDS))
 
 # ============================
