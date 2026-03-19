@@ -31,50 +31,45 @@ def check_password():
 if not check_password():
     st.stop()
 
-# ============================
-# API 키
-# ============================
 NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
-# 상품 사전 (secrets에서 추가 가능)
+# 상품 사전 (Secrets에서 추가 가능)
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
 _default = [
-    "발목양말","압축봉","텀블러","마스크팩","수세미","칫솔","면봉",
-    "화장솜","지퍼백","행거","클립","바구니","파우치","보냉백","우산",
-    "슬리퍼","도마","접시","그릇","컵","머그컵","물병","케이스","파일",
-    "메모지","스티커","테이프","가위","자","풀","빗","거울","족집게",
-    "면도기","손톱깎이","헤어핀","머리끈","수건","욕실화","칫솔걸이",
-    "비누통","샴푸통","휴지통","집게","옷걸이","선반","훅","고리",
-    "매트","방석","쿠션","양초","방향제","모기향","살충제","세제","장갑",
-    "충전기","케이블","이어폰","건전지","보조배터리","압축팩","세탁망",
-    "빨래집게","행주","앞치마","냄비받침","주방장갑","국자","주걱",
-    "병따개","캔따개","채반","소쿠리","식판","도시락","물통","빨대",
-    "청소포","밀대","빗자루","쓰레받기","위생봉투","쓰레기봉투"
+    "텀블러","머그컵","물병","보온병","수저","젓가락","앞치마","도마","냄비","프라이팬",
+    "수세미","행주","지퍼백","압축봉","양말","장갑","모자","우산","슬리퍼","샌들",
+    "칫솔","치약","면봉","화장솜","면도기","족집게","빗","거울","헤어핀","마스크팩",
+    "파우치","충전기","케이블","이어폰","건전지","보조배터리","마우스","키보드",
+    "메모지","파일","테이프","가위","풀","클립","바구니","수납함","행거","옷걸이",
+    "선반","훅","매트","쿠션","방석","양초","방향제","모기향","세제","청소포",
+    "밀대","빗자루","쓰레기봉투","위생봉투","압축팩","세탁망","빨래집게",
+    "냄비받침","주방장갑","국자","주걱","병따개","캔따개","채반","소쿠리",
+    "식판","도시락","빨대","샴푸통","비누통","휴지통","욕실화","수건",
+    "손톱깎이","머리끈","케이스","스티커","자석","가습기","선풍기","전구",
+    "젤램프","네일","향수","바디워시","폼클렌저","치실","혀클리너","귀이개",
+    "실내화","쿨매트","무릎담요","담요","베개","이불","수납박스","정리대"
 ]
 PRODUCT_DICT = sorted(set(_custom + _default), key=len, reverse=True)
 
-# ============================
-# 동의어 사전
-# ============================
 SYNONYM_DICT = {
-    "양말":     ["발목양말","쿠션양말","스포츠양말","덧신"],
     "텀블러":   ["보온병","보냉병","스텐컵"],
     "수세미":   ["설거지솔","수세미볼","철수세미"],
-    "마스크팩": ["팩","마스크시트","시트팩"],
+    "마스크팩": ["시트팩","마스크시트"],
     "바구니":   ["바스켓","정리함","수납함","트레이"],
     "행거":     ["스탠드행거","빨래걸이"],
-    "압축봉":   ["욕실봉","샤워커튼봉","수납봉"],
     "매트":     ["발매트","욕실매트","미끄럼방지매트"],
     "충전기":   ["어댑터","충전어댑터","멀티충전기"],
     "케이블":   ["충전선","USB선","C타입선","라이트닝"],
-    "집게":     ["빨래집게","클립집게","자석집게"],
-    "지퍼백":   ["비닐백","보관백","냉동백"],    
     "마우스":   ["무선마우스","유선마우스","블루투스마우스"],
     "키보드":   ["무선키보드","유선키보드","블루투스키보드"],
+    "지퍼백":   ["비닐백","보관백","냉동백"],
+    "가습기":   ["초음파가습기","미니가습기","가열식가습기"],
+    "젤램프":   ["젤네일램프","UV램프","LED램프","네일램프"],
+    "전구":     ["LED전구","형광등","야간등"],
 }
 
 # ============================
@@ -93,7 +88,6 @@ PRODUCT_KEYWORDS = [
 ]
 
 def is_complaint(text, brand):
-    # 다이소는 무조건 포함되어야 함
     if "다이소" not in text:
         return False
     return (any(kw in text for kw in PRODUCT_KEYWORDS)
@@ -104,11 +98,8 @@ def is_complaint(text, brand):
 # ============================
 def check_query(query):
     warnings, suggestions = [], []
-    brand = query.split()[0]
-    if len(brand) < 2:
-        warnings.append("브랜드명이 너무 짧아요")
     if not any(h in query for h in ["불만","불량","후기","리뷰","문제","이상"]):
-        suggestions.append(f'💡 추천: **"{brand} 불만"** 또는 **"{brand} 불량 후기"**')
+        suggestions.append('💡 추천: **"다이소 불만"** 또는 **"다이소 불량 후기"**')
     if len(query.strip()) > 20:
         warnings.append("검색어가 너무 길면 결과가 적을 수 있어요")
     return warnings, suggestions
@@ -147,12 +138,12 @@ def ai_sentiment(text, model):
 # 3차: 불만 유형 분류
 # ============================
 COMPLAINT_TYPES = {
-    "품질불량": ["불량","파손","깨짐","터짐","찢어짐","벗겨짐","고장","녹","곰팡이","변형","휘어짐","부러짐","갈라짐","오염","불량품"],
-    "안전성":   ["유해","위험","냄새","악취","화학","독성","알레르기","피부트러블","가려움","발진","환경호르몬","납","중금속"],
-    "스펙불일치":["작다","크다","짧다","길다","무겁다","가볍다","두껍다","얇다","생각보다","예상보다","사진과 다름","실물과 다름","색이 다름","크기가 다름"],
-    "내구성":   ["약하다","금방","며칠만에","하루만에","한달도","바로","얼마안가","금방망가","쉽게망가","오래못감","질이나쁨"],
-    "구매경험": ["환불","반품","교환","불친절","응대","서비스","AS","품절","재고없음","구하기힘듦","단종","배송"],
-    "가성비":   ["비싸다","가격대비","돈낭비","아깝다","손해","바가지","가성비나쁨","비쌈","돈이아깝"]
+    "품질불량": ["불량","파손","깨짐","터짐","찢어짐","벗겨짐","고장","녹","곰팡이","변형","부러짐","갈라짐","오염","불량품"],
+    "안전성":   ["유해","위험","냄새","악취","독성","알레르기","피부트러블","가려움","발진","환경호르몬","납","중금속"],
+    "스펙불일치":["작다","크다","짧다","길다","무겁다","가볍다","두껍다","얇다","생각보다","예상보다","사진과 다름","실물과 다름","색이 다름"],
+    "내구성":   ["약하다","금방","며칠만에","하루만에","바로","얼마안가","쉽게망가","오래못감"],
+    "구매경험": ["환불","반품","교환","불친절","응대","AS","품절","재고없음","단종","배송"],
+    "가성비":   ["비싸다","가격대비","돈낭비","아깝다","손해","바가지","가성비나쁨"]
 }
 
 def classify_type(text):
@@ -162,29 +153,79 @@ def classify_type(text):
 # ============================
 # 3차: 상품명 추출
 # ============================
+# 품명으로 절대 쓰면 안 되는 단어 목록
 STOPWORDS = {
-    "다이소","구매","후기","리뷰","사용","제품","상품","추천","가격","할인",
-    "불만","불량","고장","파손","이거","저거","이것","저것","그것","여기","거기",
-    "해당","관련","같은","어떤","이런","저런","그런","모든","일부","전체","보면","대한",
-    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인","자","마우스","무선","유선","감도","성능","기능"
+    # 브랜드/플랫폼
+    "다이소","네이버","블로그","지식인","카카오","쿠팡","이마트","온라인","오프라인",
+    # 조사/부사/대명사
+    "자","은","는","이","가","을","를","의","에","도","만","로","으로","에서","에게",
+    "이것","저것","그것","이거","저거","그거","여기","저기","거기","이곳","저곳",
+    # 일반 명사 (품명 아닌 것)
+    "구매","후기","리뷰","사용","제품","상품","추천","가격","할인","불만","불량",
+    "고장","파손","해당","관련","같은","어떤","이런","저런","그런","모든","일부","전체",
+    "보면","대한","위한","통해","따라","방법","질문","문의","안내","설명","확인",
+    "손님","진상","거기에","영양제","신문","기사","쿠폰","소송","대응","피고","원고",
+    "회복","민생","카오","페이","소비자","발명가","기업","브랜드","매장","지점",
+    "상품은","제품은","거기는","이것은","저것은","그것은",
+    # 속성어 (품명 아님)
+    "무선","유선","감도","속도","성능","기능","구조","방식","형태","종류","색상",
+    "크기","사이즈","용량","무게","두께","길이","너비","높이",
+    # 짧은 단어 필터 (1글자)
+    "자","기","것","수","때","곳","점","집","법","식","형","용","급","형","판",
 }
 
 def extract_product(text, brand="다이소"):
+    # 1순위: 사전 직접 매칭 (긴 단어 우선)
     for p in PRODUCT_DICT:
-        if p in text: return p
+        if p in text:
+            return p
+
+    # 2순위: 동의어 매칭
     for key, synonyms in SYNONYM_DICT.items():
         for s in synonyms:
-            if s in text: return key
-    m = re.search(rf'{brand}\s+([가-힣]{{2,8}})(?=\s|$|[이을를의은는가])', text)
-    if m and m.group(1) not in STOPWORDS: return m.group(1)
-    m = re.search(r'([가-힣]{2,8})\s+(?:후기|리뷰|불량|파손|고장|불만)(?:\s|$|[이을를])', text)
-    if m and m.group(1) not in STOPWORDS: return m.group(1)
+            if s in text:
+                return key
+
+    # 3순위: "다이소 X" 패턴 — 조사 없는 명사만 (2글자 이상, 순수 한글)
+    m = re.search(r'다이소\s+([가-힣]{2,8})(?=[^가-힣]|$)', text)
+    if m:
+        candidate = m.group(1)
+        if candidate not in STOPWORDS and len(candidate) >= 2:
+            return candidate
+
+    # 4순위: "X 불량/후기/고장" 패턴 — 순수 한글 명사만
+    m = re.search(r'([가-힣]{2,8})\s+(?:불량|파손|고장|후기|리뷰)(?:\s|$)', text)
+    if m:
+        candidate = m.group(1)
+        if candidate not in STOPWORDS and len(candidate) >= 2:
+            return candidate
+
     return ""
 
+# ============================
+# 품번 / 가격 추출
+# ============================
 def extract_info(text):
-    codes  = re.findall(r'(?<![0-9,원])\b\d{5,10}\b(?!\d)(?![\d,]*원)', text)
-    prices = re.findall(r'\d{1,3}(?:,\d{3})*원', text)
-    return {"품번": ", ".join(list(dict.fromkeys(codes))[:3]), "가격": ", ".join(set(prices))}
+    # 가격: 숫자+원 패턴, 단 000원 같은 HTML 잔여물 제외
+    prices = re.findall(r'[1-9]\d{0,2}(?:,\d{3})*원', text)
+    # 품번: 5~10자리 숫자, 가격 아닌 것
+    codes = re.findall(r'(?<![0-9,])\b[1-9]\d{4,9}\b(?![0-9])', text)
+    # 가격으로 잡힌 숫자는 품번에서 제외
+    price_nums = [re.sub(r'[,원]', '', p) for p in prices]
+    codes = [c for c in codes if c not in price_nums]
+    return {
+        "품번": ", ".join(list(dict.fromkeys(codes))[:3]),
+        "가격": ", ".join(set(prices))
+    }
+
+# ============================
+# 텍스트 정제 (HTML 태그 + 특수문자 제거)
+# ============================
+def clean_text(text):
+    text = re.sub(r'<[^>]+>', ' ', text)   # HTML 태그 제거
+    text = re.sub(r'&[a-z]+;', ' ', text)  # HTML 엔티티 제거 (&amp; 등)
+    text = re.sub(r'\s+', ' ', text)       # 연속 공백 정리
+    return text.strip()
 
 # ============================
 # 네이버 검색
@@ -201,7 +242,8 @@ def search_naver(query, type_, display=100):
                 timeout=10)
             batch = res.json().get("items", [])
             if not batch: break
-            for item in batch: item["출처"] = "블로그" if type_ == "blog" else "지식인"
+            for item in batch:
+                item["출처"] = "블로그" if type_ == "blog" else "지식인"
             items += batch
         except Exception as e:
             st.warning(f"수집 오류: {e}"); break
@@ -209,30 +251,46 @@ def search_naver(query, type_, display=100):
     return items
 
 # ============================
-# 날짜 파싱
+# 날짜 파싱 (블로그 + 지식인 모두 처리)
 # ============================
+MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+             "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
+
 def parse_date(item):
     d = item.get("postdate") or item.get("pubDate", "")
     if not d: return None
     d = d.strip()
     try:
+        # 블로그: "20250317"
         if re.match(r'^\d{8}$', d):
             return datetime.strptime(d, "%Y%m%d")
-        elif "," in d:
+
+        # 지식인: "Mon, 17 Mar 2025 00:00:00 +0900"
+        if "," in d:
             parts = d.split()
+            # parts = ['Mon,', '17', 'Mar', '2025', ...]
             if len(parts) >= 4:
-                return datetime.strptime(f"{parts[1]} {parts[2]} {parts[3]}", "%d %b %Y")
-        elif re.match(r'^\d{4}-\d{2}-\d{2}', d):
+                day   = int(parts[1])
+                month = MONTH_MAP.get(parts[2], 0)
+                year  = int(parts[3])
+                if month > 0:
+                    return datetime(year, month, day)
+
+        # YYYY-MM-DD 형식
+        if re.match(r'^\d{4}-\d{2}-\d{2}', d):
             return datetime.strptime(d[:10], "%Y-%m-%d")
+
     except:
-        return None
+        pass
+    return None
 
 def filter_by_date(items, start, end):
     s, e = datetime.strptime(start, "%Y%m%d"), datetime.strptime(end, "%Y%m%d")
     result = []
     for item in items:
         dt = parse_date(item)
-        if dt is None or s <= dt <= e: result.append(item)
+        if dt is None or s <= dt <= e:
+            result.append(item)
     return result
 
 # ============================
@@ -261,11 +319,8 @@ def create_excel(data, query, start_date, end_date):
     ws2["A1"].font = openpyxl.styles.Font(bold=True, size=14)
     for row in [[],["목적","AI 파인튜닝용 학습 데이터 수집"],[],["입력값","의미","예시"],
                 ["1","실제 불만글","텀블러 뚜껑 깨짐 환불요청"],["0","불만 아닌 글","다이소 어디서 파나요?"],
-                ["빈칸","확인 안 함 (미사용)",""],[],["목표","1+0 합쳐서 200개 이상 → 파인튜닝 가능"]]:
+                ["빈칸","확인 안 함",""],[],["목표","200개 이상 → 파인튜닝 가능"]]:
         ws2.append(row)
-    ws2.column_dimensions["A"].width = 15
-    ws2.column_dimensions["B"].width = 35
-    ws2.column_dimensions["C"].width = 40
     for col, w in zip("ABCDEFGHIJK",[10,18,14,14,40,48,12,10,10,20,16]):
         ws.column_dimensions[col].width = w
     buf = io.BytesIO()
@@ -278,21 +333,28 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 st.title("🤬 네이버 고객불만 AI 분석기 by PC")
 st.markdown("블로그·지식인 **불만 후기만** 수집 → AI 감성분석 → 불만유형 자동분류")
-st.caption("🤖 KR-ELECTRA-SC  |  1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
+st.caption("🤖 KR-FinBert-SC  |  1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
 st.divider()
 
 with st.sidebar:
-    st.header("[분석 조건 설정]")
+    st.header("⚙️ 분석 설정")
 
     st.markdown("**🔎 검색어**")
-    st.caption("검색어를 입력하세요")
+    st.caption("브랜드 + 상품명 + 불만키워드 조합")
+    st.markdown("""
+| 목적 | 예시 |
+|------|------|
+| 전체 불만 | `다이소 불만` |
+| 특정 상품 | `다이소 텀블러 불량` |
+| 특정 유형 | `다이소 환불 불편` |
+""")
     query = st.text_input("검색어 입력", value="다이소 불만", label_visibility="collapsed")
 
     if query:
         warnings, suggestions = check_query(query)
         for w in warnings: st.warning(f"⚠️ {w}")
         for s in suggestions: st.info(s)
-        if not warnings and not suggestions: st.success("✅ 검색 가능")
+        if not warnings and not suggestions: st.success("✅ 검색어 적절")
 
     c1, c2 = st.columns(2)
     with c1: start_date = st.text_input("시작일", "20250101", help="YYYYMMDD")
@@ -304,7 +366,6 @@ with st.sidebar:
     st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
 
     display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
-
     st.divider()
     run = st.button("🐎 분석 시작", use_container_width=True, type="primary")
 
@@ -329,7 +390,9 @@ if run:
     prog = st.progress(0, text="분석 중...")
 
     for i, item in enumerate(filtered):
-        text = re.sub(r'<[^>]+>', '', item.get("title","") + " " + item.get("description","")).strip()
+        title = clean_text(item.get("title", ""))
+        desc  = clean_text(item.get("description", ""))
+        text  = title + " " + desc
 
         if not is_complaint(text, brand):
             skipped += 1
@@ -343,11 +406,15 @@ if run:
         dt      = parse_date(item)
 
         results.append({
-            "출처": item["출처"], "품명": product,
-            "title": re.sub(r'<[^>]+>', '', item.get("title","")),
-            "link": item.get("link",""),
-            "날짜": dt.strftime("%Y-%m-%d") if dt else "",
-            "감성": senti, "확신도": score, "불만유형": ctype, **info
+            "출처":  item["출처"],
+            "품명":  product,
+            "title": title,
+            "link":  item.get("link",""),
+            "날짜":  dt.strftime("%Y-%m-%d") if dt else "",
+            "감성":  senti,
+            "확신도": score,
+            "불만유형": ctype,
+            **info
         })
         prog.progress((i+1)/len(filtered), text=f"분석 중... ({i+1}/{len(filtered)})")
 
