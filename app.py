@@ -26,7 +26,7 @@ def check_password():
     if st.session_state.authenticated:
         return True
 
-    st.markdown("## 🔐 로그인")
+    st.markdown("## LOG IN")
     pw = st.text_input("비밀번호를 입력하세요", type="password")
 
     if st.button("입력"):
@@ -68,12 +68,20 @@ def search_naver(query, search_type="blog", display=100):
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
     }
-    params = {"query": query, "display": display, "sort": "date"}
-    response = requests.get(url, headers=headers, params=params)
-    items = response.json().get("items", [])
-    for item in items:
-        item["출처"] = "블로그" if search_type == "blog" else "지식인"
-    return items
+    all_items = []
+    start = 1
+    while start <= display:
+        fetch = min(100, display - start + 1)
+        params = {"query": query, "display": fetch, "start": start, "sort": "date"}
+        response = requests.get(url, headers=headers, params=params)
+        items = response.json().get("items", [])
+        if not items:
+            break
+        for item in items:
+            item["출처"] = "블로그" if search_type == "blog" else "지식인"
+        all_items += items
+        start += fetch
+    return all_items
 
 
 # ============================
@@ -133,26 +141,31 @@ def ai_sentiment(text, model):
 # 품번 / 품명 / 가격 추출
 # ============================
 def extract_product_info(text, query_brand="다이소"):
-    code_pattern = r'[A-Za-z]{1,3}[-_]?\d{3,6}|NO\.?\d{2,5}'
+    # 품번: 5~10자리 연속 숫자
+    code_pattern = r'\b\d{5,10}\b'
     codes = re.findall(code_pattern, text)
 
+    # 가격 패턴
     price_pattern = r'\d{1,3}(?:,\d{3})*원'
     prices = re.findall(price_pattern, text)
 
-    name_pattern = rf'{query_brand}\s+([가-힣\s]{{2,12}})'
+    # 품명: 2~10글자 한글 명사 (구매/후기/리뷰/사용/제품/상품 앞에 오는 단어)
+    name_pattern = r'([가-힣]{2,10})\s*(?:구매|후기|리뷰|사용기|사용|제품|상품|추천)'
     names = re.findall(name_pattern, text)
 
-    review_pattern = r'([가-힣]{2,8})\s*(?:구매|후기|리뷰|사용)'
-    review_names = re.findall(review_pattern, text)
+    # 브랜드명 뒤에 오는 품명
+    brand_pattern = rf'{query_brand}\s+([가-힣]{{2,10}})'
+    brand_names = re.findall(brand_pattern, text)
 
-    all_names = list(dict.fromkeys(names + review_names))[:3]
+    # 합치기 (중복 제거, 최대 3개)
+    stopwords = {"다이소", "구매", "후기", "리뷰", "사용", "제품", "상품", "추천", "가격", "할인"}
+    all_names = [n for n in list(dict.fromkeys(brand_names + names)) if n not in stopwords][:3]
 
     return {
-        "품번": ", ".join(set(codes)) if codes else "",
+        "품번": ", ".join(list(dict.fromkeys(codes))[:3]) if codes else "",
         "가격언급": ", ".join(set(prices)) if prices else "",
         "품명추출": ", ".join(all_names) if all_names else ""
     }
-
 
 # ============================
 # 엑셀 생성 (파일로 저장 아닌 메모리로)
@@ -208,37 +221,37 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 # 메인 UI
 # ============================
-st.title("🔍 네이버 리뷰 AI분석기 by PC")
+st.title("🤬네이버 고객품질불만 AI분석기 by PC")
 st.markdown("블로그·지식인 리뷰를 수집하고 AI로 감성을 자동 분석합니다.")
 st.divider()
 
 # 사이드바 설정
 with st.sidebar:
     st.header("Main")
-    query = st.text_input("🔎 검색어", value="검색어를 입력하세요") ### 검색에서, 띄어쓰기를 반영하여 적용
+    query = st.text_input("검색어", value="검색어를 입력하세요") ### 검색에서, 띄어쓰기를 반영하여 적용
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.text_input("시작일", value="20250101", help="YYYYMMDD 형식")
+        start_date = st.text_input("시작", value="20250101", help="YYYYMMDD 형식")
     with col2:
-        end_date = st.text_input("종료일", value="20250317", help="YYYYMMDD 형식")
+        end_date = st.text_input("종료", value="20250317", help="YYYYMMDD 형식")
 
-    search_blog = st.checkbox("블로그 수집", value=True)
-    search_kin = st.checkbox("지식인 수집", value=True)
-    display_count = st.slider("수집 개수 (최대)", 10, 100, 100, step=10)
+    search_blog = st.checkbox("블로그 품질불만", value=True)
+    search_kin = st.checkbox("지식인 품질불만", value=True)
+    display_count = st.slider("수집 개수 (최대)", 10, 1000, 100, step=100)
 
-    run_btn = st.button("🚀 분석 시작", use_container_width=True, type="primary")
+    run_btn = st.button("🐎분석 시작", use_container_width=True, type="primary")
 
 # 분석 실행
 if run_btn:
     if not query:
-        st.error("검색어를 입력해주세요!")
+        st.error("검색어를 입력하세요")
         st.stop()
 
     if not search_blog and not search_kin:
         st.error("블로그 또는 지식인 중 하나는 선택해주세요!")
         st.stop()
 
-    with st.spinner("🤖 AI 모델 로딩 중... (처음 실행 시 약 1~2분 소요)"):
+    with st.spinner("🤖 AI 분석 중... (처음 실행 시 약 1~2분 소요)"):
         sentiment_model = load_model()
 
     # 수집
@@ -259,7 +272,7 @@ if run_btn:
     st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
 
     if not filtered:
-        st.warning("⚠️ 해당 기간에 결과가 없어요. 날짜 범위를 넓혀보세요!")
+        st.warning("⚠️ 해당 기간에 결과가 없습니다.")
         st.stop()
 
     # 분석
