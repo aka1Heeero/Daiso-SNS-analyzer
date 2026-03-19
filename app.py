@@ -257,31 +257,29 @@ MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
              "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
 
 def parse_date(item):
-    d = item.get("postdate") or item.get("pubDate", "")
-    if not d: return None
-    d = d.strip()
-    try:
-        # 블로그: "20250317"
+    # 출처에 따라 다른 필드 사용
+    if item.get("출처") == "블로그":
+        d = item.get("postdate", "").strip()
         if re.match(r'^\d{8}$', d):
-            return datetime.strptime(d, "%Y%m%d")
+            try:
+                return datetime.strptime(d, "%Y%m%d")
+            except:
+                return None
 
-        # 지식인: "Mon, 17 Mar 2025 00:00:00 +0900"
+    elif item.get("출처") == "지식인":
+        d = item.get("pubDate", "").strip()
         if "," in d:
-            parts = d.split()
-            # parts = ['Mon,', '17', 'Mar', '2025', ...]
-            if len(parts) >= 4:
+            try:
+                parts = d.split()
+                # ['Mon,', '17', 'Mar', '2025', '00:00:00', '+0900']
                 day   = int(parts[1])
                 month = MONTH_MAP.get(parts[2], 0)
                 year  = int(parts[3])
                 if month > 0:
                     return datetime(year, month, day)
+            except:
+                return None
 
-        # YYYY-MM-DD 형식
-        if re.match(r'^\d{4}-\d{2}-\d{2}', d):
-            return datetime.strptime(d[:10], "%Y-%m-%d")
-
-    except:
-        pass
     return None
 
 def filter_by_date(items, start, end):
