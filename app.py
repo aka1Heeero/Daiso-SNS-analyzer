@@ -6,32 +6,33 @@ import io
 from datetime import datetime
 from transformers import pipeline
 from collections import Counter
+import pandas as pd
 
 # ============================
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="🤬네이버 고객품질불만 AI분석기 by PC",
+    page_title="🤬 다이소 고객불만 AI분석 by PC",
     page_icon="🔍",
     layout="wide"
 )
 
 # ============================
-# 비밀번호 체크
+# 비밀번호
 # ============================
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-    if st.session_state.authenticated:
+    if "auth" not in st.session_state:
+        st.session_state.auth = False
+    if st.session_state.auth:
         return True
     st.markdown("## LOG IN")
     pw = st.text_input("비밀번호를 입력하세요", type="password")
     if st.button("입력"):
         if pw == st.secrets["PASSWORD"]:
-            st.session_state.authenticated = True
+            st.session_state.auth = True
             st.rerun()
         else:
-            st.error("❌ 비밀번호가 틀렸습니다.")
+            st.error("❌ 비밀번호 오류")
     return False
 
 if not check_password():
@@ -44,315 +45,448 @@ NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
-# 불만 필터 키워드
+# 상품 사전 (secrets에서 추가 가능)
+# ============================
+_raw = st.secrets.get("DAISO_PRODUCTS", "")
+_custom = [p.strip() for p in _raw.split(",") if p.strip()]
+_default = [
+    "발목양말","압축봉","텀블러","마스크팩","수세미","칫솔","면봉",
+    "화장솜","지퍼백","행거","클립","바구니","파우치","보냉백","우산",
+    "슬리퍼","도마","접시","그릇","컵","머그컵","물병","케이스","파일",
+    "메모지","스티커","테이프","가위","자","풀","빗","거울","족집게",
+    "면도기","손톱깎이","헤어핀","머리끈","수건","욕실화","칫솔걸이",
+    "비누통","샴푸통","휴지통","집게","옷걸이","선반","훅","고리",
+    "매트","방석","쿠션","양초","방향제","모기향","살충제","세제","장갑",
+    "충전기","케이블","이어폰","건전지","보조배터리","압축팩","세탁망",
+    "빨래집게","행주","앞치마","냄비받침","주방장갑","국자","주걱",
+    "병따개","캔따개","채반","소쿠리","식판","도시락","물통","빨대",
+    "청소포","밀대","빗자루","쓰레받기","위생봉투","쓰레기봉투"
+]
+PRODUCT_DICT = sorted(set(_custom + _default), key=len, reverse=True)
+
+# ============================
+# 1차: 불만 필터 키워드
 # ============================
 COMPLAINT_KEYWORDS = [
-    "불만", "불편", "별로", "실망", "최악", "나쁨", "후회", "환불",
-    "불량", "파손", "고장", "터짐", "깨짐", "냄새", "이상", "문제",
-    "아쉽", "싸구려", "저품질", "흠", "짧다", "작다", "크다",
-    "무겁다", "약하다", "얇다", "두껍다", "불량품", "반품", "교환",
-    "불편하다", "위험", "유해", "녹", "곰팡이", "찢어짐", "벗겨짐", "비추"
+    "불만","불편","별로","실망","최악","나쁨","후회","환불",
+    "불량","파손","고장","터짐","깨짐","냄새","이상","문제",
+    "아쉽","싸구려","저품질","불량품","반품","교환","비추",
+    "불편하다","위험","유해","녹","곰팡이","찢어짐","벗겨짐",
+    "짧다","작다","크다","무겁다","약하다","얇다","두껍다"
 ]
-
 PRODUCT_KEYWORDS = [
-    "샀", "구매", "구입", "제품", "상품", "사용", "써봤", "써보니",
-    "개봉", "사봤", "가격", "원짜리", "원에", "원인데", "후기", "리뷰"
+    "샀","구매","구입","제품","상품","사용","써봤","써보니",
+    "개봉","사봤","가격","원짜리","원에","원인데","후기","리뷰"
 ]
 
-# ============================
-# 관련성 필터
-# ============================
-def is_relevant(text, brand):
-    has_brand = brand.lower() in text.lower()
-    has_product = any(kw in text for kw in PRODUCT_KEYWORDS)
+def is_complaint(text, brand):
+    has_brand     = brand.lower() in text.lower()
+    has_product   = any(kw in text for kw in PRODUCT_KEYWORDS)
     has_complaint = any(kw in text for kw in COMPLAINT_KEYWORDS)
     return has_brand and has_product and has_complaint
 
 # ============================
-# AI 모델 로드 — KR-ELECTRA (업그레이드)
+# 검색어 적정성 검사
+# ============================
+def check_query(query):
+    """검색어가 분석 목적에 적합한지 확인"""
+    warnings = []
+    suggestions = []
+
+    # 브랜드명 확인
+    brand = query.split()[0]
+    if len(brand) < 2:
+        warnings.append("브랜드명이 너무 짧아요")
+
+    # 불만 키워드 포함 여부
+    complaint_hints = ["불만","불량","후기","리뷰","문제","이상"]
+    has_hint = any(h in query for h in complaint_hints)
+    if not has_hint:
+        suggestions.append(f'💡 불만 관련 키워드 추가 추천: **"{brand} 불만"** 또는 **"{brand} 불량 후기"**')
+
+    # 너무 짧은 쿼리
+    if len(query.strip()) < 4:
+        warnings.append("검색어가 너무 짧아요. 브랜드명 + 키워드 조합을 추천해요")
+
+    # 너무 긴 쿼리
+    if len(query.strip()) > 20:
+        warnings.append("검색어가 너무 길면 결과가 적을 수 있어요")
+
+    return warnings, suggestions
+
+# ============================
+# 2차: AI 감성 분석
 # ============================
 @st.cache_resource
 def load_model():
-    # KR-ELECTRA 기반 한국어 감성분석 모델
     return pipeline(
         "sentiment-analysis",
-        model="monologg/koelectra-base-finetuned-sentiment",
+        model="snunlp/KR-ELECTRA-SC",
         truncation=True,
         max_length=512
     )
 
+DEFAULT_POSITIVE = [
+    "꿀이었","강추","최고","완벽","대박","굿","좋았","만족",
+    "추천","좋아요","훌륭","짱","최애","득템","필수템","꿀템"
+]
+DEFAULT_NEGATIVE = [
+    "최악","환불","불량품","쓰레기","망했","최저","형편없",
+    "절대비추","비추","후회","실망","돈낭비","진짜별로"
+]
+
+def ai_sentiment(text, model, extra_pos=None, extra_neg=None):
+    pos_kw = DEFAULT_POSITIVE + (extra_pos or [])
+    neg_kw = DEFAULT_NEGATIVE + (extra_neg or [])
+    if any(kw in text for kw in pos_kw):
+        return "호평", 95.0
+    if any(kw in text for kw in neg_kw):
+        return "악평", 95.0
+    try:
+        r = model(text[:512])[0]
+        label = r["label"].lower()
+        score = round(r["score"] * 100, 1)
+        if "pos" in label or label == "1":
+            return "호평", score
+        elif "neg" in label or label == "0":
+            return "악평", score
+        return "중립", score
+    except:
+        return "분석불가", 0.0
+
 # ============================
-# 네이버 검색 (페이징 최대 1000건)
+# 3차: 불만 유형 분류
 # ============================
-def search_naver(query, search_type="blog", display=100):
-    url = f"https://openapi.naver.com/v1/search/{search_type}.json"
+COMPLAINT_TYPES = {
+    "품질불량": [
+        "불량","파손","깨짐","터짐","찢어짐","벗겨짐","고장","녹",
+        "곰팡이","변형","휘어짐","부러짐","갈라짐","오염","불량품"
+    ],
+    "안전성": [
+        "유해","위험","냄새","악취","화학","독성","알레르기",
+        "피부트러블","가려움","발진","환경호르몬","납","중금속"
+    ],
+    "스펙불일치": [
+        "작다","크다","짧다","길다","무겁다","가볍다","두껍다","얇다",
+        "생각보다","예상보다","사진과 다름","실물과 다름","색이 다름","크기가 다름"
+    ],
+    "내구성": [
+        "약하다","금방","며칠만에","하루만에","한달도","바로","얼마안가",
+        "금방망가","쉽게망가","오래못감","질이나쁨"
+    ],
+    "구매경험": [
+        "환불","반품","교환","불친절","응대","서비스","AS","품절",
+        "재고없음","구하기힘듦","단종","배송"
+    ],
+    "가성비": [
+        "비싸다","가격대비","돈낭비","아깝다","손해","바가지",
+        "가성비나쁨","비쌈","돈이아깝"
+    ]
+}
+
+def classify_type(text):
+    matched = [t for t, kws in COMPLAINT_TYPES.items() if any(kw in text for kw in kws)]
+    return ", ".join(matched[:2]) if matched else "기타불만"
+
+# ============================
+# 3차: 상품명 추출
+# ============================
+STOPWORDS = {
+    "다이소","구매","후기","리뷰","사용","제품","상품","추천",
+    "가격","할인","불만","불량","고장","파손","이거","저거",
+    "이것","저것","그것","여기","거기","해당","관련","같은",
+    "어떤","이런","저런","그런","모든","일부","전체","보면","대한",
+    "한국","일본","중국","온라인","오프라인","매장","블로그","지식인"
+}
+
+def extract_product(text, brand="다이소"):
+    for p in PRODUCT_DICT:
+        if p in text:
+            return p
+    m = re.search(rf'{brand}\s+([가-힣]{{2,8}})(?=\s|$|[이을를의은는가])', text)
+    if m and m.group(1) not in STOPWORDS:
+        return m.group(1)
+    m = re.search(r'([가-힣]{2,8})\s+(?:후기|리뷰|불량|파손|고장|불만)(?:\s|$|[이을를])', text)
+    if m and m.group(1) not in STOPWORDS:
+        return m.group(1)
+    return ""
+
+def extract_info(text):
+    codes  = re.findall(r'(?<![0-9,원])\b\d{5,10}\b(?!\d)(?![\d,]*원)', text)
+    prices = re.findall(r'\d{1,3}(?:,\d{3})*원', text)
+    return {
+        "품번": ", ".join(list(dict.fromkeys(codes))[:3]),
+        "가격": ", ".join(set(prices))
+    }
+
+# ============================
+# 네이버 검색
+# ============================
+def search_naver(query, type_, display=100):
+    url = f"https://openapi.naver.com/v1/search/{type_}.json"
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
     }
-    all_items = []
-    start = 1
+    items, start = [], 1
     while start <= display:
         fetch = min(100, display - start + 1)
-        params = {"query": query, "display": fetch, "start": start, "sort": "date"}
         try:
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            items = response.json().get("items", [])
-            if not items:
+            res = requests.get(url, headers=headers,
+                params={"query": query, "display": fetch, "start": start, "sort": "date"},
+                timeout=10)
+            batch = res.json().get("items", [])
+            if not batch:
                 break
-            for item in items:
-                item["출처"] = "블로그" if search_type == "blog" else "지식인"
-            all_items += items
+            for item in batch:
+                item["출처"] = "블로그" if type_ == "blog" else "지식인"
+            items += batch
         except Exception as e:
-            st.warning(f"수집 오류 (start={start}): {e}")
+            st.warning(f"수집 오류: {e}")
             break
         start += fetch
-    return all_items
-
-# ============================
-# 텍스트 정제
-# ============================
-def clean_text(text):
-    return re.sub(r'<[^>]+>', '', text).strip()
+    return items
 
 # ============================
 # 날짜 파싱
 # ============================
 def parse_date(item):
-    date_str = item.get("postdate") or item.get("pubDate", "")
-    if not date_str:
+    d = item.get("postdate") or item.get("pubDate", "")
+    if not d:
         return None
     try:
-        if len(date_str) == 8:
-            return datetime.strptime(date_str, "%Y%m%d")
-        elif "," in date_str:
-            # 지식인: "Mon, 17 Mar 2025 00:00:00 +0900"
-            return datetime.strptime(date_str[:22].strip(), "%a, %d %b %Y")
-        elif len(date_str) >= 10:
-            return datetime.strptime(date_str[:10], "%Y-%m-%d")
+        if len(d) == 8:
+            return datetime.strptime(d, "%Y%m%d")
+        elif "," in d:
+            return datetime.strptime(d[:22].strip(), "%a, %d %b %Y")
+        elif len(d) >= 10:
+            return datetime.strptime(d[:10], "%Y-%m-%d")
     except:
         try:
-            # 한 번 더 시도 — 공백 기준으로 날짜만 추출
-            parts = date_str.split()
-            if len(parts) >= 4:
-                return datetime.strptime(f"{parts[1]} {parts[2]} {parts[3]}", "%d %b %Y")
+            p = d.split()
+            if len(p) >= 4:
+                return datetime.strptime(f"{p[1]} {p[2]} {p[3]}", "%d %b %Y")
         except:
-            return None
+            pass
+    return None
 
-# ============================
-# 날짜 필터링
-# ============================
 def filter_by_date(items, start, end):
-    start_dt = datetime.strptime(start, "%Y%m%d")
-    end_dt = datetime.strptime(end, "%Y%m%d")
+    s = datetime.strptime(start, "%Y%m%d")
+    e = datetime.strptime(end, "%Y%m%d")
     result = []
     for item in items:
         dt = parse_date(item)
-        if dt is None:
-            result.append(item)
-        elif start_dt <= dt <= end_dt:
+        if dt is None or s <= dt <= e:
             result.append(item)
     return result
 
 # ============================
-# AI 감성 분석 (ELECTRA 라벨 매핑)
-# ============================
-# 명백한 긍정/부정 표현 오버라이드
-POSITIVE_OVERRIDE = [
-    "꿀이었", "강추", "최고", "완벽", "대박", "굿", "좋았", "만족",
-    "추천", "좋아요", "훌륭", "짱", "최애", "득템", "필수템"
-]
-NEGATIVE_OVERRIDE = [
-    "최악", "환불", "불량품", "쓰레기", "망했", "최저", "형편없",
-    "절대비추", "비추", "후회", "실망"
-]
-
-def ai_sentiment(text, model):
-    try:
-        if any(kw in text for kw in POSITIVE_OVERRIDE):
-            return "호평", 95.0
-        if any(kw in text for kw in NEGATIVE_OVERRIDE):
-            return "악평", 95.0
-
-        result = model(text[:512])[0]
-        label = result["label"].lower()
-        score = round(result["score"] * 100, 1)
-        if label in ["positive", "1", "pos"]:
-            return "호평", score
-        elif label in ["negative", "0", "neg"]:
-            return "악평", score
-        else:
-            return "중립", score
-    except:
-        return "분석불가", 0.0
-
-# ============================
-# 품번 / 품명 / 가격 추출
-# ============================
-def extract_product_info(text, query_brand="다이소"):
-    # 품번: 5~10자리 숫자, 단 앞뒤로 다른 숫자 없고 "원" 안 붙은 것만
-    code_pattern = r'(?<![0-9,])\b\d{5,10}\b(?![\d,]*원)'
-    codes = re.findall(code_pattern, text)
-
-    # 가격 패턴
-    price_pattern = r'\d{1,3}(?:,\d{3})*원'
-    prices = re.findall(price_pattern, text)
-
-    # 품명: 브랜드명 바로 뒤에 오는 2~8자 한글 명사만
-    brand_pattern = rf'{query_brand}\s+([가-힣]{{2,8}})(?:\s|$|이|을|를|의|은|는|이|가)'
-    brand_names = re.findall(brand_pattern, text)
-
-    # 품명: "X 후기/리뷰/불량" 패턴에서 추출 (단, 조사/부사 제외)
-    name_pattern = r'([가-힣]{2,8})\s+(?:후기|리뷰|불량|파손|고장|불만)'
-    names = re.findall(name_pattern, text)
-
-    # 불필요한 단어 제거 (stopwords 대폭 확장)
-    stopwords = {
-        query_brand, "다이소", "구매", "후기", "리뷰", "사용", "제품", "상품",
-        "추천", "가격", "할인", "불만", "불량", "고장", "파손", "이거", "저거",
-        "이것", "저것", "그것", "여기", "거기", "해당", "관련", "내에서",
-        "같은", "어떤", "이런", "저런", "그런", "모든", "일부", "전체",
-        "한국", "일본", "중국", "온라인", "오프라인", "매장", "지점",
-        "소비자", "발명가", "기업들", "네트망", "커뮤니티", "배송에서",
-        "눈여겨", "여행사", "패키지", "자유여행",
-    }
-    all_names = [n for n in list(dict.fromkeys(brand_names + names))
-                 if n not in stopwords and len(n) >= 2][:3]
-
-    return {
-        "품번": ", ".join(list(dict.fromkeys(codes))[:3]) if codes else "",
-        "가격언급": ", ".join(set(prices)) if prices else "",
-        "품명추출": ", ".join(all_names) if all_names else ""
-    }
-
-# ============================
-# 엑셀 생성
+# 엑셀 생성 (태깅 컬럼 포함)
 # ============================
 def create_excel(data, query, start_date, end_date):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "AI 불만 분석"
 
-    headers = ["출처", "품명추출", "품번", "가격언급", "제목", "링크", "날짜", "감성", "확신도(%)"]
+    # ★ 태깅 컬럼 추가: 마지막에 "불만여부(태깅)" 컬럼
+    headers = [
+        "출처","품명","품번","가격","제목","링크","날짜",
+        "감성","확신도(%)","불만유형",
+        "불만여부(태깅)"  # ← 여기에 1 또는 0 입력
+    ]
     ws.append(headers)
 
-    for col in range(1, len(headers) + 1):
-        ws.cell(row=1, column=col).font = openpyxl.styles.Font(bold=True)
-        ws.cell(row=1, column=col).fill = openpyxl.styles.PatternFill(
-            start_color="D9D9D9", end_color="D9D9D9", fill_type="solid"
-        )
+    # 헤더 스타일
+    for col in range(1, len(headers)+1):
+        ws.cell(1, col).font = openpyxl.styles.Font(bold=True)
+        ws.cell(1, col).fill = openpyxl.styles.PatternFill(
+            start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
 
-    color_map = {
-        "호평": "C6EFCE",
-        "악평": "FFC7CE",
-        "중립": "FFEB9C",
-        "분석불가": "D9D9D9"
+    # 태깅 컬럼 헤더는 노란색으로 강조
+    ws.cell(1, 11).fill = openpyxl.styles.PatternFill(
+        start_color="FFD700", end_color="FFD700", fill_type="solid")
+    ws.cell(1, 11).font = openpyxl.styles.Font(bold=True, color="000000")
+
+    s_colors = {"호평":"C6EFCE","악평":"FFC7CE","중립":"FFEB9C","분석불가":"D9D9D9"}
+    t_colors = {
+        "품질불량":"FCE4D6","안전성":"FFE0E0","스펙불일치":"EAF0FB",
+        "내구성":"FFF2CC","구매경험":"E2EFDA","가성비":"F0E6FF","기타불만":"F2F2F2"
     }
 
-    for row_idx, row in enumerate(data, start=2):
+    for ri, r in enumerate(data, 2):
         ws.append([
-            row["출처"], row["품명추출"], row["품번"], row["가격언급"],
-            row["title"], row["link"], row["날짜"], row["감성"], row["확신도"]
+            r["출처"], r["품명"], r["품번"], r["가격"],
+            r["title"], r["link"], r["날짜"],
+            r["감성"], r["확신도"], r["불만유형"],
+            ""  # 태깅 컬럼 빈칸 (사용자가 1 또는 0 입력)
         ])
-        fill_color = color_map.get(row["감성"], "FFFFFF")
-        ws.cell(row=row_idx, column=8).fill = openpyxl.styles.PatternFill(
-            start_color=fill_color, end_color=fill_color, fill_type="solid"
-        )
+        ws.cell(ri, 8).fill = openpyxl.styles.PatternFill(
+            start_color=s_colors.get(r["감성"],"FFFFFF"),
+            end_color=s_colors.get(r["감성"],"FFFFFF"), fill_type="solid")
+        first_type = r["불만유형"].split(",")[0].strip()
+        ws.cell(ri, 10).fill = openpyxl.styles.PatternFill(
+            start_color=t_colors.get(first_type,"F2F2F2"),
+            end_color=t_colors.get(first_type,"F2F2F2"), fill_type="solid")
+        # 태깅 컬럼 연한 노란색 배경
+        ws.cell(ri, 11).fill = openpyxl.styles.PatternFill(
+            start_color="FFFDE7", end_color="FFFDE7", fill_type="solid")
 
-    for col, width in zip("ABCDEFGHI", [10, 20, 15, 15, 40, 50, 12, 10, 12]):
-        ws.column_dimensions[col].width = width
+    # 태깅 안내 시트 추가
+    ws2 = wb.create_sheet("📌 태깅 안내")
+    ws2.append(["태깅 방법 안내"])
+    ws2.append([])
+    ws2.append(["목적", "AI 파인튜닝용 학습 데이터 수집"])
+    ws2.append(["방법", "'불만여부(태깅)' 컬럼에 아래 값을 입력하세요"])
+    ws2.append([])
+    ws2.append(["입력값", "의미", "예시"])
+    ws2.append(["1", "실제 불만글 (학습에 사용)", "텀블러 뚜껑 깨짐 환불요청"])
+    ws2.append(["0", "불만 아닌 글 (학습에 사용)", "다이소 어디서 파나요?"])
+    ws2.append(["빈칸", "확인 안 함 (학습에 미사용)", ""])
+    ws2.append([])
+    ws2.append(["목표", "1과 0을 합쳐서 200개 이상 모으면 파인튜닝 가능"])
+    ws2.append(["팁", "전부 태깅 안 해도 됩니다. 확실한 것만 해주세요"])
+    ws2.column_dimensions["A"].width = 20
+    ws2.column_dimensions["B"].width = 40
+    ws2.column_dimensions["C"].width = 40
+    ws2["A1"].font = openpyxl.styles.Font(bold=True, size=14)
 
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return buffer
+    for col, w in zip("ABCDEFGHIJK", [10,18,14,14,40,48,12,10,10,20,16]):
+        ws.column_dimensions[col].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
 
 # ============================
 # 메인 UI
 # ============================
-st.title("🤬 네이버 고객품질불만 AI분석기 by PC")
-st.markdown("블로그·지식인에서 **불만 후기만** 수집하고 AI로 감성을 자동 분석합니다.")
-st.caption("🤖 AI 모델: koelectra-base-finetuned-sentiment")
+st.title("🤬 네이버 고객불만 AI 분석기 by PC")
+st.markdown("블로그·지식인 **불만 후기만** 수집 → AI 감성분석 → 불만유형 자동분류")
+st.caption("🤖 KR-ELECTRA-SC  |  파이프라인: 1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
 st.divider()
 
 with st.sidebar:
     st.header("⚙️ 분석 설정")
-    query = st.text_input("🔎 검색어 (다이소 포함)", value="다이소 상품 불만")
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.text_input("시작일", value="20250101", help="YYYYMMDD 형식")
-    with col2:
-        end_date = st.text_input("종료일", value="20260101", help="YYYYMMDD 형식")
 
-    search_blog = st.checkbox("블로그 수집", value=True)
-    search_kin = st.checkbox("지식인 수집", value=True)
-    display_count = st.slider("수집 개수 (최대)", 100, 1000, 100, step=100)
+    query = st.text_input("🔎 검색어 (브랜드명 포함)", value="다이소 상품 불만")
 
-    run_btn = st.button("🐎 분석 시작", use_container_width=True, type="primary")
+    # ② 검색어 적정성 실시간 체크
+    if query:
+        warnings, suggestions = check_query(query)
+        for w in warnings:
+            st.warning(f"⚠️ {w}")
+        for s in suggestions:
+            st.info(s)
+        if not warnings and not suggestions:
+            st.success("✅ 검색어가 적절합니다")
 
-if run_btn:
+    c1, c2 = st.columns(2)
+    with c1: start_date = st.text_input("시작일", "20250101", help="YYYYMMDD")
+    with c2: end_date   = st.text_input("종료일",  "20260101", help="YYYYMMDD")
+
+    st.markdown("**수집 채널**")
+    do_blog = st.checkbox("블로그", value=True)
+    do_kin  = st.checkbox("지식인", value=True)
+    st.checkbox("🚧 Youtube (추가중)", value=False, disabled=True)
+    display_count = st.slider("최대 수집 수", 100, 1000, 100, step=100)
+
+    # ③ 상품 사전 안내
+    st.divider()
+    with st.expander("📦 상품 사전이란?"):
+        st.markdown("""
+**상품 사전**은 AI가 글에서 상품명을 찾아낼 때 참고하는 단어 목록이에요.
+
+예를 들어 *"다이소 텀블러 뚜껑이 깨졌어요"* 라는 글에서
+→ **텀블러** 를 상품명으로 인식하는 것이 상품 사전 덕분이에요.
+
+**현재 등록된 상품 수:** """ + f"`{len(PRODUCT_DICT)}개`" + """
+
+**상품 추가 방법:**
+Streamlit Cloud → 앱 설정 → Secrets 에서
+```
+DAISO_PRODUCTS = "신제품명1, 신제품명2"
+```
+를 추가하면 코드 수정 없이 바로 반영돼요.
+        """)
+        # 현재 사전 목록 보여주기
+        if st.checkbox("현재 상품 목록 보기"):
+            st.write(", ".join(sorted(PRODUCT_DICT)))
+
+    st.divider()
+    st.markdown("**🎯 감성 키워드 직접 추가**")
+    st.caption("AI가 놓치는 표현을 직접 입력 (쉼표 구분)")
+    extra_pos_txt = st.text_area("✅ 호평 키워드", "꿀템, 완전좋아", height=60)
+    extra_neg_txt = st.text_area("❌ 악평 키워드", "진짜별로, 돈낭비", height=60)
+
+    run = st.button("🐎 분석 시작", use_container_width=True, type="primary")
+
+extra_pos = [k.strip() for k in extra_pos_txt.split(",") if k.strip()]
+extra_neg = [k.strip() for k in extra_neg_txt.split(",") if k.strip()]
+
+if run:
     if not query:
         st.error("검색어를 입력하세요")
         st.stop()
-    if not search_blog and not search_kin:
-        st.error("블로그 또는 지식인 중 하나는 선택해주세요!")
+    if not do_blog and not do_kin:
+        st.error("채널을 하나 이상 선택하세요")
         st.stop()
 
-    with st.spinner("🤖 AI 모델 로딩 및 분석중입니다............................"):
-        sentiment_model = load_model()
+    with st.spinner("🤖 AI 모델 로딩 중..."):
+        model = load_model()
 
     all_items = []
-    with st.spinner("📡 데이터 수집 중..."):
-        if search_blog:
-            blog_items = search_naver(query, "blog", display_count)
-            all_items += blog_items
-            st.info(f"블로그 {len(blog_items)}개 수집")
-        if search_kin:
-            kin_items = search_naver(query, "kin", display_count)
-            all_items += kin_items
-            st.info(f"지식인 {len(kin_items)}개 수집")
+    with st.spinner("📡 수집 중..."):
+        if do_blog:
+            b = search_naver(query, "blog", display_count)
+            all_items += b
+            st.info(f"블로그 {len(b)}개")
+        if do_kin:
+            k = search_naver(query, "kin", display_count)
+            all_items += k
+            st.info(f"지식인 {len(k)}개")
 
     filtered = filter_by_date(all_items, start_date, end_date)
     st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
-
     if not filtered:
-        st.warning("⚠️ 해당 기간에 결과가 없습니다.")
+        st.warning("해당 기간에 결과가 없습니다.")
         st.stop()
 
-    brand = query.split()[0]
+    brand   = query.split()[0]
     results = []
     skipped = 0
-    progress = st.progress(0, text="분석 중...")
+    prog    = st.progress(0, text="분석 중...")
 
     for i, item in enumerate(filtered):
-        title = clean_text(item.get("title", ""))
-        desc = clean_text(item.get("description", ""))
-        full_text = title + " " + desc
+        text = re.sub(r'<[^>]+>', '',
+            item.get("title","") + " " + item.get("description","")).strip()
 
-        if not is_relevant(full_text, brand):
+        if not is_complaint(text, brand):
             skipped += 1
-            progress.progress((i + 1) / len(filtered), text=f"필터링 중... ({i+1}/{len(filtered)})")
+            prog.progress((i+1)/len(filtered), text=f"1차 필터 중... ({i+1}/{len(filtered)})")
             continue
 
-        sentiment, score = ai_sentiment(full_text, sentiment_model)
-        product_info = extract_product_info(full_text, query_brand=brand)
-        dt = parse_date(item)
-        date_str = dt.strftime("%Y-%m-%d") if dt else ""
+        senti, score = ai_sentiment(text, model, extra_pos, extra_neg)
+        product = extract_product(text, brand)
+        ctype   = classify_type(text)
+        info    = extract_info(text)
+        dt      = parse_date(item)
 
         results.append({
-            "출처": item["출처"],
-            "title": title,
-            "link": item.get("link", ""),
-            "날짜": date_str,
-            "감성": sentiment,
-            "확신도": score,
-            **product_info
+            "출처":     item["출처"],
+            "품명":     product,
+            "title":    re.sub(r'<[^>]+>', '', item.get("title","")),
+            "link":     item.get("link",""),
+            "날짜":     dt.strftime("%Y-%m-%d") if dt else "",
+            "감성":     senti,
+            "확신도":   score,
+            "불만유형": ctype,
+            **info
         })
+        prog.progress((i+1)/len(filtered), text=f"분석 중... ({i+1}/{len(filtered)})")
 
-        progress.progress((i + 1) / len(filtered), text=f"분석 중... ({i+1}/{len(filtered)})")
-
-    progress.empty()
-    st.success(f"✅ 분석 완료! 불만 관련 {len(results)}개 (무관련 {skipped}개 제외)")
+    prog.empty()
+    st.success(f"✅ 완료! 불만 {len(results)}개 / 일반글 {skipped}개 제외")
     st.divider()
 
     if not results:
@@ -360,52 +494,77 @@ if run_btn:
         st.stop()
 
     total = len(results)
-    pos = sum(1 for r in results if r["감성"] == "호평")
-    neg = sum(1 for r in results if r["감성"] == "악평")
-    neu = sum(1 for r in results if r["감성"] == "중립")
+    pos = sum(1 for r in results if r["감성"]=="호평")
+    neg = sum(1 for r in results if r["감성"]=="악평")
+    neu = sum(1 for r in results if r["감성"]=="중립")
 
-    st.subheader("📊 분석 요약")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("불만 관련 전체", f"{total}개")
-    c2.metric("호평 😊", f"{pos}개", f"{round(pos/total*100)}%")
-    c3.metric("악평 😞", f"{neg}개", f"{round(neg/total*100)}%")
-    c4.metric("중립 😐", f"{neu}개", f"{round(neu/total*100)}%")
+    st.subheader("📊 감성 요약")
+    m1,m2,m3,m4 = st.columns(4)
+    m1.metric("전체",f"{total}개")
+    m2.metric("호평 😊",f"{pos}개",f"{round(pos/total*100)}%")
+    m3.metric("악평 😞",f"{neg}개",f"{round(neg/total*100)}%")
+    m4.metric("중립 😐",f"{neu}개",f"{round(neu/total*100)}%")
 
-    all_names = []
+    st.subheader("🗂️ 불만 유형 분포")
+    all_types = []
     for r in results:
-        if r["품명추출"]:
-            all_names.extend(r["품명추출"].split(", "))
-    if all_names:
-        st.subheader("🏷️ 많이 언급된 품명 TOP 5")
-        for name, count in Counter(all_names).most_common(5):
-            st.write(f"**{name}**: {count}회")
+        all_types.extend([t.strip() for t in r["불만유형"].split(",")])
+    t_counts = Counter(all_types).most_common()
+    tc1, tc2 = st.columns(2)
+    for idx, (t, c) in enumerate(t_counts[:6]):
+        col = tc1 if idx < 3 else tc2
+        col.write(f"**{t}**: {c}건 ({round(c/total*100)}%)")
+
+    name_list = [r["품명"] for r in results if r["품명"]]
+    if name_list:
+        st.subheader("🏷️ 불만 품명 TOP 5")
+        for name, cnt in Counter(name_list).most_common(5):
+            st.write(f"**{name}**: {cnt}건")
 
     st.subheader("📋 상세 결과")
-    import pandas as pd
-    df = pd.DataFrame(results)
-    df = df.rename(columns={
-        "title": "제목", "link": "링크", "날짜": "날짜",
-        "감성": "감성", "확신도": "확신도(%)",
-        "품명추출": "품명", "품번": "품번", "가격언급": "가격"
-    })
+    s_col = {"호평":"#C6EFCE","악평":"#FFC7CE","중립":"#FFEB9C"}
+    t_col = {
+        "품질불량":"#FCE4D6","안전성":"#FFE0E0","스펙불일치":"#EAF0FB",
+        "내구성":"#FFF2CC","구매경험":"#E2EFDA","가성비":"#F0E6FF","기타불만":"#F2F2F2"
+    }
+    rows_html = ""
+    for r in results:
+        s_bg = s_col.get(r["감성"],"#FFF")
+        t_bg = t_col.get(r["불만유형"].split(",")[0].strip(),"#F2F2F2")
+        link = f'<a href="{r["link"]}" target="_blank">🔗</a>' if r["link"] else ""
+        rows_html += f"""<tr>
+            <td>{r["출처"]}</td><td>{r["품명"]}</td><td>{r["품번"]}</td>
+            <td>{r["가격"]}</td><td>{r["title"]}</td><td>{link}</td>
+            <td>{r["날짜"]}</td>
+            <td style="background:{s_bg};font-weight:bold">{r["감성"]}</td>
+            <td>{r["확신도"]}</td>
+            <td style="background:{t_bg}">{r["불만유형"]}</td>
+        </tr>"""
 
-    def highlight_sentiment(val):
-        color_map = {"호평": "#C6EFCE", "악평": "#FFC7CE", "중립": "#FFEB9C"}
-        return f"background-color: {color_map.get(val, '')}"
+    st.markdown(f"""
+    <style>
+      .rt{{width:100%;border-collapse:collapse;font-size:12px}}
+      .rt th{{background:#D9D9D9;padding:7px 8px;border:1px solid #ccc;text-align:left}}
+      .rt td{{padding:6px 8px;border:1px solid #eee;vertical-align:middle}}
+      .rt tr:hover td{{background:#f9f9f9}}
+      .rt a{{color:#1a73e8;text-decoration:none;font-size:14px}}
+    </style>
+    <div style="max-height:500px;overflow-y:auto">
+    <table class="rt"><thead><tr>
+      <th>출처</th><th>품명</th><th>품번</th><th>가격</th>
+      <th>제목</th><th>링크</th><th>날짜</th><th>감성</th><th>확신도</th><th>불만유형</th>
+    </tr></thead><tbody>{rows_html}</tbody></table></div>
+    """, unsafe_allow_html=True)
 
-    st.dataframe(
-        df[["출처", "품명", "품번", "가격", "제목", "날짜", "감성", "확신도(%)"]].style.applymap(
-            highlight_sentiment, subset=["감성"]
-        ),
-        use_container_width=True,
-        height=400
-    )
-
+    # ① 엑셀 다운로드 — 태깅 안내 포함
     st.subheader("💾 결과 다운로드")
-    excel_buffer = create_excel(results, query, start_date, end_date)
+    st.info("""📌 **엑셀에 태깅 컬럼이 포함되어 있어요!**
+다운로드 후 **'불만여부(태깅)'** 컬럼에 → 실제 불만글이면 **1**, 아니면 **0** 입력
+200개 이상 모이면 AI 파인튜닝에 활용할 수 있어요. **'📌 태깅 안내' 시트**를 참고하세요.""")
+
+    excel_buf = create_excel(results, query, start_date, end_date)
     st.download_button(
-        label="📥 엑셀 파일 다운로드",
-        data=excel_buffer,
+        "📥 엑셀 다운로드 (태깅 컬럼 포함)", data=excel_buf,
         file_name=f"불만분석_{query[:5]}_{start_date}_{end_date}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
