@@ -257,28 +257,26 @@ MONTH_MAP = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
              "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
 
 def parse_date(item):
-    # 출처에 따라 다른 필드 사용
-    if item.get("출처") == "블로그":
-        d = item.get("postdate", "").strip()
-        if re.match(r'^\d{8}$', d):
-            try:
-                return datetime.strptime(d, "%Y%m%d")
-            except:
-                return None
+    # 블로그: postdate = "20250317"
+    d = item.get("postdate", "").strip()
+    if re.match(r'^\d{8}$', d):
+        try:
+            return datetime.strptime(d, "%Y%m%d")
+        except:
+            pass
 
-    elif item.get("출처") == "지식인":
-        d = item.get("pubDate", "").strip()
-        if "," in d:
-            try:
-                parts = d.split()
-                # ['Mon,', '17', 'Mar', '2025', '00:00:00', '+0900']
-                day   = int(parts[1])
-                month = MONTH_MAP.get(parts[2], 0)
-                year  = int(parts[3])
-                if month > 0:
-                    return datetime(year, month, day)
-            except:
-                return None
+    # 지식인: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
+    d = item.get("pubDate", "").strip()
+    if "," in d:
+        try:
+            parts = d.split()
+            day   = int(parts[1])
+            month = MONTH_MAP.get(parts[2], 0)
+            year  = int(parts[3])
+            if month > 0:
+                return datetime(year, month, day)
+        except:
+            pass
 
     return None
 
@@ -483,3 +481,4 @@ if run:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
+
