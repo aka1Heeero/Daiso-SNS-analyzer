@@ -276,7 +276,7 @@ st.caption("🤖 KR-ELECTRA-SC  |  1차 불만필터 → 2차 감성분석 → 3
 st.divider()
 
 with st.sidebar:
-    st.header("⚙️ 분석 설정")
+    st.header("[분석 조건 설정]")
 
     st.markdown("**🔎 검색어**")
     st.caption("검색어를 입력하세요")
