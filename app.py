@@ -39,6 +39,7 @@ NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 # ============================
 # 상품 사전 (Secrets에서 관리)
+# Secrets의 DAISO_PRODUCTS에 상품명 추가할수록 품명 추출 정확도 UP
 # ============================
 _raw = st.secrets.get("DAISO_PRODUCTS", "")
 _custom = [p.strip() for p in _raw.split(",") if p.strip()]
@@ -62,9 +63,6 @@ SYNONYM_DICT = {
     "전구":     ["LED전구","형광등","야간등"],
 }
 
-# ============================
-# 출처 매핑
-# ============================
 SOURCE_MAP = {
     "blog":        "블로그",
     "kin":         "지식인",
@@ -73,6 +71,7 @@ SOURCE_MAP = {
 
 # ============================
 # 1차: 불만 필터
+# 핵심: 다이소 제품에 대한 직접적 불만이어야 함
 # ============================
 COMPLAINT_KEYWORDS = [
     "불만","불편","별로","실망","최악","나쁨","후회","환불",
@@ -81,15 +80,18 @@ COMPLAINT_KEYWORDS = [
     "불편하다","위험","유해","녹","곰팡이","찢어짐","벗겨짐",
     "짧다","작다","크다","무겁다","약하다","얇다","두껍다",
     "발색","헐겁다","헐거움","뒤틀림","휘어짐","녹슴","탁함",
-    "닳음","잘 안됨","마모","딱딱함","뻑뻑함","거침","날카로움",
-    "미끄러움","어려움","따가움","거칠다","소음","변색","이격",
-    "감전","유해함","유해성","열화","헐거워","딱딱","뻑빡","마감",
-    "불만족"
+    "닳음","마모","딱딱함","뻑뻑함","거침","날카로움","소음",
+    "변색","이격","감전","열화","마감","불만족","내구성없",
+    "품질나쁨","품질별로","품질이상","안좋다","안좋아","별로다",
 ]
+
 PRODUCT_KEYWORDS = [
     "샀","구매","구입","제품","상품","사용","써봤","써보니",
-    "개봉","사봤","가격","원짜리","원에","원인데","후기","리뷰"
+    "개봉","사봤","가격","원짜리","원에","원인데","후기","리뷰",
+    "구입했","구매했","샀는데","사용해보니","사용중","구매후","산지",
 ]
+
+# 명백한 칭찬/홍보/비교글 제외 키워드
 POSITIVE_CONTEXT = [
     "저렴해","싸다","착하다","알뜰","합리적","가성비좋","가성비최고",
     "저렴하네","싸네","가격이좋","저가","가격착해","가격이착해",
@@ -100,15 +102,25 @@ POSITIVE_CONTEXT = [
     "이거사세요","사세요","사봐","써봐","써보세요",
     "뮤지엄","박물관","미술관","해외","면세","백화점","마트보다",
     "편의점보다","온라인보다","다른곳보다","훨씬싸","비교불가",
-    "대박","화악뛰","가격이화악","놀랍","신기해","이게이가격",
-    "이가격에","이런퀄리티","가격대비좋","믿기지않","믿기지않아","감동","신용","선불폰"
+    "화악뛰","가격이화악","놀랍","신기해","이게이가격",
+    "이가격에","이런퀄리티","가격대비좋","믿기지않","믿기지않아",
+    "감동","대만족","너무좋","완전좋아","체감좋","바꾸니좋",
+    "바꾸길","잘바꿨","내돈내산추천","강력추천","적극추천",
+    "선물","내돈내산","광고아님","협찬아님","구매후기좋",
 ]
 
 def is_complaint(text, brand):
+    """
+    다이소 제품에 대한 직접적 불만글 판단
+    조건: 다이소 언급 + 칭찬글 아님 + 상품 구매/사용 언급 + 불만 표현
+    """
+    # 1. 다이소 무조건 포함
     if "다이소" not in text:
         return False
+    # 2. 명백한 칭찬/비교글 제외
     if any(kw in text for kw in POSITIVE_CONTEXT):
         return False
+    # 3. 상품 구매/사용 언급 + 불만 표현 둘 다 있어야 함
     return (any(kw in text for kw in PRODUCT_KEYWORDS)
             and any(kw in text for kw in COMPLAINT_KEYWORDS))
 
@@ -120,7 +132,7 @@ def check_query(query):
     if not any(h in query for h in ["불만","불량","후기","리뷰","문제","이상"]):
         suggestions.append('💡 추천: **"다이소 불만"** 또는 **"다이소 불량 후기"**')
     if len(query.strip()) > 20:
-        warnings.append("검색어가 길면 검색이 안됩니다")
+        warnings.append("검색어가 길면 결과가 적을 수 있어요")
     return warnings, suggestions
 
 # ============================
@@ -183,20 +195,26 @@ STOPWORDS = {
     "회복","민생","소비자","발명가","기업","브랜드","매장","지점",
     "자체","빠지는데","등에서","접촉","슈얼리","물건","교환","환불",
     "무선","유선","감도","속도","성능","기능","구조","방식","형태","종류","색상",
-    "크기","사이즈","용량","무게","두께","길이","너비","높이","거로"
+    "크기","사이즈","용량","무게","두께","길이","너비","높이",
+    "거로","으로","로써","로서","부터","까지","처럼","보다","만큼",
+    "이후","이전","동안","위에","아래","앞에","뒤에","사이에",
 }
 
 def extract_product(text, brand="다이소"):
+    # 1순위: Secrets 상품 사전 직접 매칭 (가장 정확)
     for p in PRODUCT_DICT:
         if p in text: return p
+    # 2순위: 동의어 매칭
     for key, synonyms in SYNONYM_DICT.items():
         for s in synonyms:
             if s in text: return key
+    # 3순위: "다이소 X" 패턴
     m = re.search(r'다이소\s+([가-힣]{2,8})(?=[^가-힣]|$)', text)
     if m:
         candidate = m.group(1)
         if candidate not in STOPWORDS and len(candidate) >= 2:
             return candidate
+    # 4순위: "X 불량/파손/고장" 패턴
     m = re.search(r'([가-힣]{2,8})\s+(?:불량|파손|고장|후기|리뷰)(?:\s|$)', text)
     if m:
         candidate = m.group(1)
@@ -262,14 +280,14 @@ def parse_date(item):
         try: return datetime.strptime(d, "%Y%m%d")
         except: pass
 
-    # 카페글: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
+    # 카페글/일부 채널: pubDate = "Mon, 17 Mar 2025 00:00:00 +0900"
     d = item.get("pubDate", "").strip()
-    if "," in d:
+    if d and "," in d:
         try:
             parts = d.split()
-            day   = int(parts[1])
+            day   = int(re.sub(r'\D', '', parts[1]))
             month = MONTH_MAP.get(parts[2], 0)
-            year  = int(parts[3])
+            year  = int(re.sub(r'\D', '', parts[3]))
             if month > 0: return datetime(year, month, day)
         except: pass
 
@@ -284,6 +302,7 @@ def filter_by_date(items, start, end):
             result.append(item)
             continue
         dt = parse_date(item)
+        # 날짜 파싱 실패 or 범위 내 → 포함
         if dt is None or s <= dt <= e:
             result.append(item)
     return result
@@ -326,9 +345,9 @@ def create_excel(data, query, start_date, end_date):
 # ============================
 # 메인 UI
 # ============================
-st.title("🤬다이소 고객 불만 AI 분석기 by PC")
+st.title("🤬 다이소 고객 불만 AI 분석기 by PC")
 st.markdown("블로그·지식인·카페 **품질 불만** 수집 → AI 감성분석 → 불만유형 자동분류")
-st.caption("🤖 KR-FinBert-SC Model 활용 by Free")
+st.caption("🤖 KR-FinBert-SC Model  |  1차 불만필터 → 2차 감성분석 → 3차 상품명+유형분류")
 st.divider()
 
 with st.sidebar:
@@ -373,14 +392,14 @@ if run:
         if do_kin:
             k = search_naver(query, "kin", display_count)
             all_items += k
-            st.info(f"지식인 {len(k)}개")
+            st.info(f"지식인 {len(k)}개 (날짜 미제공)")
         if do_cafe:
             c = search_naver(query, "cafearticle", display_count)
             all_items += c
             st.info(f"카페글 {len(c)}개")
 
     filtered = filter_by_date(all_items, start_date, end_date)
-    st.write(f"📅 날짜 필터 후: **{len(filtered)}개** (지식인 API는 날짜구분 없음)")
+    st.write(f"📅 날짜 필터 후: **{len(filtered)}개**")
     if not filtered: st.warning("해당 기간에 결과가 없습니다."); st.stop()
 
     brand, results, skipped = query.split()[0], [], 0
@@ -416,7 +435,7 @@ if run:
         prog.progress((i+1)/len(filtered), text=f"분석 중... ({i+1}/{len(filtered)})")
 
     prog.empty()
-    st.success(f"✅ 완료! 불만 {len(results)}개 / 일반글 {skipped}개 제외")
+    st.success(f"✅ 완료! 불만 {len(results)}개 / 비관련 {skipped}개 제외")
     st.divider()
 
     if not results: st.warning("불만 관련 글이 없습니다. 검색어를 바꿔보세요!"); st.stop()
