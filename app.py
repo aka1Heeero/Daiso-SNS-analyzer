@@ -13,7 +13,7 @@ import pandas as pd
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="LENS · 리뷰 감성분석",
+    page_title="DAISO LENS · 리뷰 감성분석",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded"
