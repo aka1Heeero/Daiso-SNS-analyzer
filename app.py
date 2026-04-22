@@ -834,47 +834,6 @@ with st.sidebar:
     st.markdown("<div style='margin-top:1.25rem'></div>", unsafe_allow_html=True)
     run_btn = st.button("🔵 분석 시작", use_container_width=True)
 
-    with st.expander("📌 YouTube API 키 발급"):
-        st.markdown("""
-**Step 1** Google Cloud Console 접속  
-https://console.cloud.google.com
-
-**Step 2** 새 프로젝트 생성
-
-**Step 3** YouTube Data API v3 활성화  
-API 및 서비스 → 라이브러리 → 검색 → 사용 설정
-
-**Step 4** API 키 생성  
-사용자 인증 정보 → API 키 → 복사
-
-**Step 5** secrets.toml 등록  
-```
-YOUTUBE_API_KEY = "AIzaSy..."
-```
-무료 일일 할당량 **10,000 유닛**
-        """)
-
-    with st.expander("📌 Google Sheets 품명 DB 연동"):
-        st.markdown("""
-**시트 컬럼 구조**  
-`품번 | 품명 | 소분류`
-
-**Step 1** Google Cloud → Sheets API 활성화  
-**Step 2** 서비스 계정 생성 → JSON 키 다운로드  
-**Step 3** 시트 공유 → 서비스 계정 이메일 → 뷰어 권한  
-**Step 4** secrets.toml 등록  
-```
-GSHEET_URL = "https://docs.google.com/..."
-
-[gcp_service_account]
-type = "service_account"
-project_id = "..."
-private_key = "-----BEGIN RSA PRIVATE KEY-----\\n..."
-client_email = "...@....iam.gserviceaccount.com"
-```
-캐시 주기: **1시간** (ttl=3600)
-        """)
-
 
 # ============================
 # 분석 실행
