@@ -16,7 +16,7 @@ from collections import Counter
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="DAISO LENS AI 고객 불만 분석",
+    page_title="DAISO SNS-LENS",
     page_icon="🔵",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -315,8 +315,8 @@ def check_password():
     st.markdown("""
     <div class="login-wrap">
         <div class="login-icon">🔵</div>
-        <div class="login-title">LENS</div>
-        <div class="login-sub">불만 SNS 감성분석 시스템</div>
+        <div class="login-title">DAISO SNS-LENS</div>
+        <div class="login-sub">SNS 불만/감성 AI분석 시스템</div>
     </div>
     """, unsafe_allow_html=True)
     col = st.columns([1, 2, 1])[1]
