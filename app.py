@@ -723,27 +723,14 @@ st.markdown("""
             flex-shrink:0;
             box-shadow:0 2px 6px rgba(0,102,204,0.35);
         ">
-            <svg width="30" height="20" viewBox="0 0 60 38" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- D -->
-                <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z
-                         M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
-                <!-- A -->
-                <path d="M18 18 L24 2 L30 18 M20.5 12 H27.5" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
-                <!-- I -->
-                <rect x="33" y="2" width="3.5" height="16" rx="1" fill="#FFFFFF"/>
-                <!-- S -->
-                <path d="M40 15 Q40 18 44 18 Q48 18 48 14.5 Q48 11 44 10 Q40 9 40 5.5 Q40 2 44 2 Q48 2 48 5"
-                      stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
-                <!-- O -->
-                <ellipse cx="54" cy="10" rx="5" ry="8" stroke="#FFFFFF" stroke-width="3" fill="none"/>
-            </svg>
+        </svg>
         </div>
         <div style="
             font-size:1.35rem; font-weight:900;
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">D</div>
+        ">DAISO</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
