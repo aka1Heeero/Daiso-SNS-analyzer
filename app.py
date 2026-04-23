@@ -796,7 +796,7 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">D</div>
+        ">DAISO</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
