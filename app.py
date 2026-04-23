@@ -85,10 +85,26 @@ html, body, .stApp {
     border-radius: 8px !important;
     color: var(--text) !important;
     font-size: 0.875rem !important;
+    padding: 0.3rem 0.5rem !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
+}
+/* ── 날짜 입력 간격 축소 (3번 수정) ── */
+[data-testid="stSidebar"] [data-testid="stDateInput"] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stDateInput"] > label {
+    display: none !important;
+}
+.date-label {
+    font-size: 0.7rem;
+    color: #718096;
+    margin-bottom: 2px;
+    display: block;
+    line-height: 1.2;
 }
 
 /* ── 헤더 ── */
@@ -145,7 +161,6 @@ html, body, .stApp {
     letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.5rem;
     display: flex; align-items: center; gap: 0.5rem;
 }
-/* 7번 수정: 파란 아이콘 안 텍스트 흰색 강제 */
 .metric-icon {
     width: 22px; height: 22px;
     background: var(--primary);
@@ -164,7 +179,7 @@ html, body, .stApp {
 }
 .metric-pct { font-size: 0.78rem; color: var(--text3); margin-top: 0.3rem; }
 
-/* ── 섹션 타이틀 아이콘 — 7번 수정 ── */
+/* ── 섹션 타이틀 아이콘 ── */
 .section-title-icon {
     width: 24px; height: 24px;
     background: var(--primary);
@@ -226,7 +241,7 @@ html, body, .stApp {
 .login-title { font-size: 1.3rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
 .login-sub { font-size: 0.82rem; color: var(--text3); margin-bottom: 1.5rem; }
 
-/* ── 사이드바 섹션 헤더 — 1번 수정(이모지 제거, 텍스트만) ── */
+/* ── 사이드바 섹션 헤더 ── */
 .sb-section {
     display: flex; align-items: center; gap: 0.5rem;
     padding: 0.55rem 0.7rem;
@@ -250,24 +265,34 @@ html, body, .stApp {
 }
 .sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; display: block; line-height: 1.5; }
 
-/* ── 채널 체크박스 행 ── */
-.channel-row {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.45rem 0.6rem; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--bg);
-    margin-bottom: 0.4rem; cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+/* ── 채널 체크박스 인라인 (2번 수정) ── */
+.channel-inline-row {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0; margin-bottom: 0.2rem;
 }
-.channel-row:hover { border-color: var(--primary-md); background: var(--primary-lt); }
 .ch-icon {
-    width: 26px; height: 26px; border-radius: 6px;
+    width: 22px; height: 22px; border-radius: 5px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; color: #FFFFFF !important;
-    font-weight: 700; flex-shrink: 0;
+    font-size: 0.6rem; color: #FFFFFF !important;
+    font-weight: 900; flex-shrink: 0;
 }
-.ch-naver  { background: #03C75A; }  /* 네이버 그린 */
-.ch-youtube { background: #FF0000; } /* 유튜브 레드 */
-.ch-label { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+.ch-naver   { background: #03C75A; }
+.ch-youtube { background: #FF0000; }
+.ch-label   { font-size: 0.82rem; font-weight: 500; color: var(--text); min-width: 36px; }
+
+/* 체크박스를 인라인 아이콘 옆에 붙이기 위한 스타일 */
+.channel-cb-wrap {
+    display: flex; align-items: center; gap: 0; margin: 0;
+}
+.channel-cb-wrap .stCheckbox {
+    margin: 0 !important; padding: 0 !important;
+}
+.channel-cb-wrap .stCheckbox > label {
+    padding: 0 !important; gap: 0 !important; min-height: unset !important;
+}
+.channel-cb-wrap .stCheckbox > label > span:last-child {
+    display: none !important;  /* 기본 라벨 텍스트 숨김 */
+}
 
 /* ── 숫자 입력 ── */
 [data-testid="stNumberInput"] > div {
@@ -277,7 +302,7 @@ html, body, .stApp {
     color: var(--primary) !important;
 }
 
-/* ── 버튼 ── */
+/* ── 버튼 기본 ── */
 .stButton > button {
     background: var(--primary) !important; color: #FFFFFF !important;
     border: none !important; border-radius: 8px !important;
@@ -290,6 +315,23 @@ html, body, .stApp {
     background: #0052A3 !important;
     box-shadow: 0 4px 12px rgba(0,102,204,0.3) !important;
 }
+
+/* ── 분석 시작 버튼 — 노란색, 굵고 크게 (5번 수정) ── */
+[data-testid="stSidebar"] .stButton > button {
+    background: #FFD600 !important;
+    color: #1A202C !important;
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.03em !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(255,214,0,0.35) !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: #F5C800 !important;
+    box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important;
+    color: #1A202C !important;
+}
+
 .stDownloadButton > button {
     background: var(--bg-white) !important; color: var(--primary) !important;
     border: 1.5px solid var(--primary) !important; border-radius: 8px !important;
@@ -338,9 +380,7 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
 """, unsafe_allow_html=True)
 
 
-# ============================
-# 비밀번호 인증
-# ============================
+# ============================================== 비밀번호 인증
 def check_password():
     if st.session_state.get("authenticated"):
         return True
@@ -365,18 +405,13 @@ def check_password():
 if not check_password():
     st.stop()
 
-
-# ============================
-# API 키
-# ============================
+# ============================================== API키
 NAVER_CLIENT_ID     = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
 
 
-# ============================
-# Google Sheets — 품명 DB
-# ============================
+# ============================================== 구글시트 불러오기 (품번,품명,소분류)
 @st.cache_data(ttl=3600)
 def load_product_db():
     try:
@@ -403,9 +438,7 @@ def load_subcategories():
 SUBCATEGORIES = load_subcategories()
 
 
-# ============================
-# AI 앙상블 모델
-# ============================
+# ============================================== AI모델링 (앙상블)
 @st.cache_resource
 def load_electra():
     try:
@@ -432,7 +465,9 @@ NEGATIVE_KW = [
     "조심","주의","문제","하자","뜯겨","냄새","오염","불결","지저분","더럽",
     "싸구려","허접","대충","클레임","AS","환급","반품","재구매 안","비추","별점 1",
     "별점1","1점","속았","낚였","사기","뻥","가짜","품질 나쁜","품질이 나쁜",
-    "뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠","못써","쓸모없"
+    "뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠","못써","쓸모없어",
+    "수량적음", "색이다름", "색상상이", "성능과장", "원산지 불명확", "색감차이",
+    "과포장", "과점착", "색번짐", "이염",
 ]
 POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
@@ -670,22 +705,49 @@ def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
 SENT_BADGE = {"호평":"badge-pos","악평":"badge-neg","중립":"badge-neu"}
 
 def icon(label: str) -> str:
-    """섹션 타이틀 아이콘 — 파란 박스 + 흰 텍스트 (7번 수정)"""
     return f'<span class="section-title-icon">{label}</span>'
 
 
 # ============================
-# 앱 헤더
+# 앱 헤더 (1번 수정: 다이소 로고 SVG 포함)
 # ============================
 st.markdown("""
 <div class="app-header">
-    <div class="header-icon" style="color:#FFFFFF;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+        <!-- 다이소 로고: 파란 원 + DAISO 텍스트 워드마크 형태 -->
+        <div style="
+            width:48px; height:48px;
+            background:#0066CC;
+            border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            flex-shrink:0;
+            box-shadow:0 2px 6px rgba(0,102,204,0.35);
+        ">
+            <svg width="30" height="20" viewBox="0 0 60 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- D -->
+                <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z
+                         M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
+                <!-- A -->
+                <path d="M18 18 L24 2 L30 18 M20.5 12 H27.5" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <!-- I -->
+                <rect x="33" y="2" width="3.5" height="16" rx="1" fill="#FFFFFF"/>
+                <!-- S -->
+                <path d="M40 15 Q40 18 44 18 Q48 18 48 14.5 Q48 11 44 10 Q40 9 40 5.5 Q40 2 44 2 Q48 2 48 5"
+                      stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <!-- O -->
+                <ellipse cx="54" cy="10" rx="5" ry="8" stroke="#FFFFFF" stroke-width="3" fill="none"/>
+            </svg>
+        </div>
+        <div style="
+            font-size:1.35rem; font-weight:900;
+            color:#0066CC; letter-spacing:0.12em;
+            font-family:'Inter',sans-serif;
+            line-height:1;
+        ">DAISO</div>
     </div>
+    <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">DAISO SNS-LENS · 불만 감성분석</div>
+        <div class="header-title">SNS-LENS · 불만 감성분석</div>
         <div class="header-sub">네이버 블로그 · 지식인 · 다이소 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
     </div>
 </div>
@@ -699,10 +761,8 @@ with st.sidebar:
     # 로고 영역
     st.markdown("""
     <div style="display:flex;align-items:center;gap:0.6rem;padding-bottom:1rem;border-bottom:1px solid #E2E8F0;margin-bottom:0.25rem;">
-        <div style="width:32px;height:32px;background:#0066CC;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+        <div style="width:32px;height:32px;background:#0066CC;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,102,204,0.3);">
+            <span style="color:#FFFFFF;font-size:0.65rem;font-weight:900;letter-spacing:0.05em;font-family:'Inter',sans-serif;">D</span>
         </div>
         <div>
             <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO SNS-LENS</div>
@@ -711,7 +771,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── ① 수집 채널 (위로 이동 + 아이콘 추가) ──────────────
+    # ── ① 수집 채널 ──────────────────────────────────────
     st.markdown("""
     <div class="sb-section">
         <div class="sb-section-icon" style="color:#FFFFFF;">
@@ -723,48 +783,57 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # 채널별 아이콘 체크박스 — Streamlit 체크박스 위에 HTML 라벨 오버레이
-    col_ch1, col_ch2 = st.columns(2)
-    with col_ch1:
-        # 네이버 블로그
+    # ── 2번 수정: [아이콘][라벨][체크박스] 인라인 배치 ──
+    # 블로그
+    cb1, cb2 = st.columns([5, 1])
+    with cb1:
         st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
             </div>
-            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">블로그</span>
+            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">블로그</span>
         </div>""", unsafe_allow_html=True)
+    with cb2:
         search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
 
-        # 네이버 카페
+    # 지식인
+    cb3, cb4 = st.columns([5, 1])
+    with cb3:
         st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;margin-top:0.4rem;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
             </div>
-            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">카페</span>
+            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">지식인</span>
         </div>""", unsafe_allow_html=True)
-        search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
-
-    with col_ch2:
-        # 네이버 지식인
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
-                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
-            </div>
-            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">지식인</span>
-        </div>""", unsafe_allow_html=True)
+    with cb4:
         search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
 
-        # 유튜브
+    # 카페
+    cb5, cb6 = st.columns([5, 1])
+    with cb5:
         st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;margin-top:0.4rem;">
-            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
+            </div>
+            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">카페</span>
+        </div>""", unsafe_allow_html=True)
+    with cb6:
+        search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+
+    # 유튜브
+    cb7, cb8 = st.columns([5, 1])
+    with cb7:
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
+            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
             </div>
-            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">유튜브</span>
+            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">유튜브</span>
         </div>""", unsafe_allow_html=True)
+    with cb8:
         search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
 
     # ── ② 검색어 ────────────────────────────────────────────
@@ -783,7 +852,7 @@ with st.sidebar:
                                   placeholder="줄바꿈으로 구분 · 최대 10개")
     st.markdown('<span class="sb-hint">한 줄 = 검색어 1개 (OR 조건 수집, 최대 10개)</span>', unsafe_allow_html=True)
 
-    # ── ③ 수집 기간 (달력 선택) ─────────────────────────────
+    # ── ③ 수집 기간 (간격 축소) ─────────────────────────────
     st.markdown("""
     <div class="sb-section">
         <div class="sb-section-icon">
@@ -796,15 +865,16 @@ with st.sidebar:
         <span class="sb-section-text">수집 기간</span>
     </div>
     """, unsafe_allow_html=True)
+
     dc1, dc2 = st.columns(2)
     with dc1:
-        st.markdown('<span style="font-size:0.7rem;color:#718096;display:block;margin-bottom:0.2rem;">시작일</span>', unsafe_allow_html=True)
-        start_date = st.date_input("", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
+        st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
+        start_date = st.date_input("시작일", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
     with dc2:
-        st.markdown('<span style="font-size:0.7rem;color:#718096;display:block;margin-bottom:0.2rem;">종료일</span>', unsafe_allow_html=True)
-        end_date = st.date_input("", value=date.today(), label_visibility="collapsed", key="date_end")
+        st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
+        end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
 
-    # ── ④ 수집 개수 (숫자 입력) ─────────────────────────────
+    # ── ④ 수집 개수 (최대 5,000건으로 변경) ─────────────────
     st.markdown("""
     <div class="sb-section">
         <div class="sb-section-icon">
@@ -818,13 +888,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     display_count = st.number_input(
-        "", min_value=10, max_value=3000, value=100, step=10,
+        "", min_value=10, max_value=5000, value=100, step=10,
         label_visibility="collapsed",
-        help="키워드당 수집할 최대 건수 (10 ~ 3,000)"
+        help="키워드당 수집할 최대 건수 (10 ~ 5,000)"
     )
-    st.markdown('<span class="sb-hint">키워드당 수집 건수 · 최소 10 / 최대 3,000<br>※ 네이버 API는 1회 최대 100건 제한 (자동 분할 수집)</span>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">키워드당 수집 건수 · 최소 10 / 최대 5,000<br>※ 네이버 API는 1회 최대 100건 제한 (자동 분할 수집)</span>', unsafe_allow_html=True)
 
-    # ── ⑤ 악평 확신도 (숫자 입력 + 설명) ───────────────────
+    # ── ⑤ 악평 확신도 ───────────────────────────────────────
     st.markdown("""
     <div class="sb-section">
         <div class="sb-section-icon">
@@ -872,39 +942,7 @@ with st.sidebar:
 
     st.markdown("<div style='margin-top:1.25rem'></div>", unsafe_allow_html=True)
     run_btn = st.button("분석 시작", use_container_width=True)
-
-    with st.expander("📌 YouTube API 키 발급"):
-        st.markdown("""
-**Step 1** Google Cloud Console 접속  
-https://console.cloud.google.com
-
-**Step 2** 새 프로젝트 생성
-
-**Step 3** YouTube Data API v3 활성화
-
-**Step 4** API 키 생성 → 복사
-
-**Step 5** secrets.toml 등록  
-`YOUTUBE_API_KEY = "AIzaSy..."`
-
-무료 일일 할당량 **10,000 유닛**
-        """)
-
-    with st.expander("📌 Google Sheets 품명 DB 연동"):
-        st.markdown("""
-**시트 컬럼** : `품번 | 품명 | 소분류`
-
-**Step 1** Sheets API 활성화  
-**Step 2** 서비스 계정 생성 → JSON 키  
-**Step 3** 시트 공유 → 서비스 계정 이메일 → 뷰어  
-**Step 4** secrets.toml 등록  
-```
-GSHEET_URL = "https://docs.google.com/..."
-[gcp_service_account]
-type = "service_account"
-...
-```
-        """)
+    # (6번 수정: expander 두 개 완전 제거)
 
 
 # ============================
@@ -923,9 +961,7 @@ if run_btn:
         model_e = load_electra()
         model_r = load_roberta()
 
-    # ── 수집 (네이버 API는 최대 100건이므로 display_count > 100이면 분할) ──
     def collect_naver_paged(query, search_type, total):
-        """네이버 API 100건 제한 → 최대 10페이지 반복 수집"""
         all_items = []
         fetched = 0
         start_idx = 1
@@ -945,7 +981,7 @@ if run_btn:
             all_items.extend(items)
             fetched   += len(items)
             start_idx += per_page
-            if len(items) < per_page: break  # 더 이상 없으면 종료
+            if len(items) < per_page: break
         return all_items[:total]
 
     def collect_cafe_paged(query, total):
@@ -993,13 +1029,11 @@ if run_btn:
             step += 1; prog.progress(step / max(total_steps, 1))
     prog.empty()
 
-    # 중복 제거
     seen, unique_items = set(), []
     for item in all_items:
         lnk = item.get("link","")
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
-    # 유심 관련 게시글 제외
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
         "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
@@ -1026,7 +1060,6 @@ if run_btn:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 감성 분석 ──────────────────────────────────────────
     results = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
@@ -1065,14 +1098,10 @@ if run_btn:
 
     progress_bar.empty(); status_text.empty()
 
-    # ============================
-    # 탭 구성
-    # ============================
     tab_dash, tab_blog, tab_kin, tab_cafe, tab_yt = st.tabs([
         "📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"
     ])
 
-    # ── 집계 ──────────────────────────────────────────────
     total = len(results)
     pos   = sum(1 for r in results if r["감성"]=="호평")
     neg   = sum(1 for r in results if r["감성"]=="악평")
@@ -1097,9 +1126,7 @@ if run_btn:
             month = r["날짜"][:7]
             date_neg[month] = date_neg.get(month, 0) + 1
 
-    # ── 📊 대시보드 ───────────────────────────────────────
     with tab_dash:
-        # 요약 메트릭
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         for col, cls, lbl, val, pct, ic_txt in [
@@ -1119,7 +1146,6 @@ if run_btn:
                     <div class="metric-pct">{pct}</div>
                 </div>""", unsafe_allow_html=True)
 
-        # 서브 메트릭
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
         d1, d2, d3 = st.columns(3)
         sub_u  = len(sub_cnt)
@@ -1133,7 +1159,6 @@ if run_btn:
                     <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
                 </div>""", unsafe_allow_html=True)
 
-        # 월별 악평 그래프
         if date_neg:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 악평 건수</span></div>', unsafe_allow_html=True)
             chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","악평수"]).sort_values("월")
@@ -1151,7 +1176,6 @@ if run_btn:
             )
             st.altair_chart(chart, use_container_width=True)
 
-        # TOP 10
         col_top1, col_top2 = st.columns(2)
         with col_top1:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("분류")} <span style="font-size:0.95rem;font-weight:600;">소분류 TOP 10</span></div>', unsafe_allow_html=True)
@@ -1169,7 +1193,6 @@ if run_btn:
                 html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
-        # 악평 글 목록
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("악평")} <span style="font-size:0.95rem;font-weight:600;">주요 악평 글 목록</span></div>', unsafe_allow_html=True)
         neg_results = [r for r in results if r["감성"] == "악평"]
         if neg_results:
@@ -1192,7 +1215,6 @@ if run_btn:
         else:
             st.info("악평으로 분류된 글이 없습니다.")
 
-        # 다운로드
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("↓")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span></div>', unsafe_allow_html=True)
         dl1, dl2 = st.columns(2)
         with dl1:
@@ -1206,7 +1228,6 @@ if run_btn:
             st.download_button("📥 CSV 다운로드", csv.encode("utf-8-sig"),
                 f"LENS_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
-    # ── 채널 상세 공통 함수 ────────────────────────────────
     def render_detail_tab(src_results, src_name):
         if not src_results:
             st.info(f"{src_name} 수집 결과가 없습니다."); return
@@ -1279,7 +1300,6 @@ if run_btn:
     with tab_cafe:
         render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
 
-    # ── ▶ 유튜브 ────────────────────────────────────────────
     with tab_yt:
         yt_results = [r for r in results if r["출처"]=="유튜브"]
         if not yt_results:
@@ -1330,7 +1350,6 @@ if run_btn:
                     </div>
                 </div>""", unsafe_allow_html=True)
 
-            # 댓글 분석 — 추가 예정
             st.markdown("""
             <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;text-align:center;">
                 <div style="font-size:0.9rem;font-weight:600;color:#64748B;margin-bottom:0.3rem;">💬 유튜브 댓글 감성분석</div>
@@ -1344,7 +1363,6 @@ if run_btn:
             </div>
             """, unsafe_allow_html=True)
 
-    # 하단
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
         <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS-LENS · KR-ELECTRA × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
