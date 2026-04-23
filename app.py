@@ -1284,21 +1284,25 @@ if run_btn:
         neg_results = [r for r in results if r["감성"] == "악평"]
         if neg_results:
             for r in neg_results[:20]:
-                b = SENT_BADGE.get(r["감성"],"")
-                st.markdown(f"""
-                <div class="result-card">
-                    <div class="result-title">
-                        <a href="{r['link']}" target="_blank" style="color:#1A202C;text-decoration:none;">{r['title'] or '(제목 없음)'}</a>
-                    </div>
-                    <div class="result-meta">
-                        <span>📍 {r['출처']}</span>
-                        <span>🔍 {r['검색어']}</span>
-                        <span>📅 {r['날짜']}</span>
-                        {'<span>🗂 ' + r['소분류'] + '</span>' if r.get('소분류') else ''}
-                        {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
-                        <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                _b    = SENT_BADGE.get(r["감성"], "")
+                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
+                _title = r["title"] or "(제목 없음)"
+                _html  = (
+                    '<div class="result-card">'
+                    '<div class="result-title">'
+                    '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                    '</div>'
+                    '<div class="result-meta">'
+                    '<span>📍 ' + r["출처"] + '</span>'
+                    '<span>🔍 ' + r["검색어"] + '</span>'
+                    '<span>📅 ' + r["날짜"] + '</span>'
+                    + _sub + _code + _badge +
+                    '</div>'
+                    '</div>'
+                )
+                st.markdown(_html, unsafe_allow_html=True)
         else:
             st.info("악평으로 분류된 글이 없습니다.")
 
@@ -1357,22 +1361,26 @@ if run_btn:
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과</span></div>', unsafe_allow_html=True)
         for r in src_results:
-            b = SENT_BADGE.get(r["감성"],"")
-            st.markdown(f"""
-            <div class="result-card">
-                <div class="result-title">
-                    <a href="{r['link']}" target="_blank" style="color:#1A202C;text-decoration:none;">{r['title'] or '(제목 없음)'}</a>
-                </div>
-                <div class="result-meta">
-                    <span>🔍 {r['검색어']}</span>
-                    <span>📅 {r['날짜']}</span>
-                    {'<span>🗂 ' + r['소분류'] + '</span>' if r.get('소분류') else ''}
-                    {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
-                    {'<span>🏷 ' + r['품명'] + '</span>' if r.get('품명') else ''}
-                    {'<span>💰 ' + r['가격언급'] + '</span>' if r.get('가격언급') else ''}
-                    <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
-                </div>
-            </div>""", unsafe_allow_html=True)
+            _b     = SENT_BADGE.get(r["감성"], "")
+            _sub   = ('<span>🗂 ' + r["소분류"]   + '</span>') if r.get("소분류")   else ""
+            _code  = ('<span>🔢 ' + r["품번"]     + '</span>') if r.get("품번")     else ""
+            _name  = ('<span>🏷 '  + r["품명"]     + '</span>') if r.get("품명")     else ""
+            _price = ('<span>💰 ' + r["가격언급"] + '</span>') if r.get("가격언급") else ""
+            _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
+            _title = r["title"] or "(제목 없음)"
+            _html  = (
+                '<div class="result-card">'
+                '<div class="result-title">'
+                '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                '</div>'
+                '<div class="result-meta">'
+                '<span>🔍 ' + r["검색어"] + '</span>'
+                '<span>📅 ' + r["날짜"] + '</span>'
+                + _sub + _code + _name + _price + _badge +
+                '</div>'
+                '</div>'
+            )
+            st.markdown(_html, unsafe_allow_html=True)
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
         st.download_button(f"📥 {src_name} CSV 다운로드", src_csv.encode("utf-8-sig"),
