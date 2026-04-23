@@ -773,7 +773,7 @@ with st.sidebar:
 
     # ── ① 수집 채널 ──────────────────────────────────────
     st.markdown("""
-    <div class="sb-section">
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon" style="color:#FFFFFF;">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
@@ -783,68 +783,68 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 채널 선택: 2열 그리드 [아이콘+라벨+체크박스] ──
+    # ── 채널 선택: 2열 그리드 [체크박스+아이콘+라벨] ──
     col_left, col_right = st.columns(2)
 
     # 블로그 (좌상)
     with col_left:
-        row1_l, row1_cb = st.columns([4, 1])
-        with row1_l:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
-                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">블로그</span>
-            </div>""", unsafe_allow_html=True)
+        row1_cb, row1_l = st.columns([1, 5])
         with row1_cb:
             search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
+        with row1_l:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
+                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">블로그</span>
+            </div>""", unsafe_allow_html=True)
 
     # 지식인 (우상)
     with col_right:
-        row1_r, row1_rcb = st.columns([4, 1])
-        with row1_r:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
-                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">지식인</span>
-            </div>""", unsafe_allow_html=True)
+        row1_rcb, row1_r = st.columns([1, 5])
         with row1_rcb:
             search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
+        with row1_r:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
+                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">지식인</span>
+            </div>""", unsafe_allow_html=True)
 
     # 카페 (좌하)
     with col_left:
-        row2_l, row2_cb = st.columns([4, 1])
-        with row2_l:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
-                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">카페</span>
-            </div>""", unsafe_allow_html=True)
+        row2_cb, row2_l = st.columns([1, 5])
         with row2_cb:
             search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+        with row2_l:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
+                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">카페</span>
+            </div>""", unsafe_allow_html=True)
 
     # 유튜브 (우하)
     with col_right:
-        row2_r, row2_rcb = st.columns([4, 1])
-        with row2_r:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
-                <div style="width:20px;height:20px;background:#FF0000;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
-                </div>
-                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">유튜브</span>
-            </div>""", unsafe_allow_html=True)
+        row2_rcb, row2_r = st.columns([1, 5])
         with row2_rcb:
             search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
+        with row2_r:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
+                <div style="width:18px;height:18px;background:#FF0000;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
+                </div>
+                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">유튜브</span>
+            </div>""", unsafe_allow_html=True)
 
     # ── ② 검색어 ────────────────────────────────────────────
     st.markdown("""
-    <div class="sb-section">
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -854,13 +854,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
-                                  height=120, label_visibility="collapsed",
+                                  height=95, label_visibility="collapsed",
                                   placeholder="줄바꿈으로 구분 · 최대 10개")
-    st.markdown('<span class="sb-hint">한 줄 = 검색어 1개 (OR 조건 수집, 최대 10개)</span>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개</span>', unsafe_allow_html=True)
 
-    # ── ③ 수집 기간 (간격 축소) ─────────────────────────────
+    # ── ③ 수집 기간 ─────────────────────────────────────────
     st.markdown("""
-    <div class="sb-section">
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -880,9 +880,9 @@ with st.sidebar:
         st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
         end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
 
-    # ── ④ 수집 개수 (최대 5,000건으로 변경) ─────────────────
+    # ── ④ 수집 개수 ─────────────────────────────────────────
     st.markdown("""
-    <div class="sb-section">
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
@@ -898,11 +898,11 @@ with st.sidebar:
         label_visibility="collapsed",
         help="키워드당 수집할 최대 건수 (10 ~ 5,000)"
     )
-    st.markdown('<span class="sb-hint">키워드당 수집 건수 · 최소 10 / 최대 5,000<br>※ 네이버 API는 1회 최대 100건 제한 (자동 분할 수집)</span>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">키워드당 최대 건수 · 10~5,000</span>', unsafe_allow_html=True)
 
     # ── ⑤ 악평 확신도 ───────────────────────────────────────
     st.markdown("""
-    <div class="sb-section">
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -917,38 +917,10 @@ with st.sidebar:
         label_visibility="collapsed",
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 악평으로 등록"
     )
-    st.markdown("""
-    <span class="sb-hint">
-    · <b>40~55%</b> : 민감 — 불확실한 글도 악평 포함<br>
-    · <b>60~70%</b> : 권장 — 명확한 불만 위주 수집<br>
-    · <b>75%+</b> &nbsp;: 엄격 — 확실한 악평만 수집
-    </span>
-    """, unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">40~55% 민감 · 60~70% 권장 · 75%+ 엄격</span>', unsafe_allow_html=True)
 
-    # ── ⑥ 유튜브 댓글 — 추가예정 ────────────────────────────
-    st.markdown("""
-    <div class="sb-section">
-        <div class="sb-section-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-            </svg>
-        </div>
-        <span class="sb-section-text">유튜브 댓글 분석</span>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <div class="badge-coming">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        추가 예정 기능입니다
-    </div>
-    <span class="sb-hint" style="margin-top:0.35rem;">유튜브 댓글 감성분석은 다음 버전에서 제공됩니다</span>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:1.25rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     run_btn = st.button("분석 시작", use_container_width=True)
-    # (6번 수정: expander 두 개 완전 제거)
 
 
 # ============================
@@ -967,26 +939,21 @@ if run_btn:
         model_e = load_electra()
         model_r = load_roberta()
 
+    # ── 수집 함수 ──────────────────────────────────────────
     def collect_naver_paged(query, search_type, total):
         all_items = []
-        fetched = 0
-        start_idx = 1
-        per_page = 100
+        fetched = 0; start_idx = 1; per_page = 100
         while fetched < total:
             url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
             headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
             params  = {"query": query, "display": per_page, "start": start_idx, "sort": "date"}
             try:
-                resp  = requests.get(url, headers=headers, params=params, timeout=10)
-                items = resp.json().get("items", [])
-            except Exception:
-                break
+                items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
+            except Exception: break
             if not items: break
             label = "블로그" if search_type == "blog" else "지식인"
             for item in items: item["출처"] = label; item["검색어"] = query
-            all_items.extend(items)
-            fetched   += len(items)
-            start_idx += per_page
+            all_items.extend(items); fetched += len(items); start_idx += per_page
             if len(items) < per_page: break
         return all_items[:total]
 
@@ -1006,34 +973,48 @@ if run_btn:
                 if "다이소" in cn or "DAISO" in cn.upper():
                     item["출처"] = "카페"; item["검색어"] = query; item["channel"] = cn
                     all_items.append(item)
-            fetched   += len(items)
-            start_idx += per_page
+            fetched += len(items); start_idx += per_page
             if len(items) < per_page: break
         return all_items[:total]
 
-    all_items, collect_log = [], []
-    prog = st.progress(0)
-    total_steps = len(keywords) * sum([search_blog, search_kin, search_cafe, search_yt])
-    step = 0
+    # ── ★ 병렬 수집 (ThreadPoolExecutor) ──────────────────
+    import concurrent.futures
 
+    collect_tasks = []
     for kw in keywords:
-        if search_blog:
-            r = collect_naver_paged(kw, "blog", display_count)
-            all_items.extend(r); collect_log.append(f"블로그/{kw}/{len(r)}건")
-            step += 1; prog.progress(step / max(total_steps, 1))
-        if search_kin:
-            r = collect_naver_paged(kw, "kin", display_count)
-            all_items.extend(r); collect_log.append(f"지식인/{kw}/{len(r)}건")
-            step += 1; prog.progress(step / max(total_steps, 1))
-        if search_cafe:
-            r = collect_cafe_paged(kw, display_count)
-            all_items.extend(r); collect_log.append(f"카페/{kw}/{len(r)}건")
-            step += 1; prog.progress(step / max(total_steps, 1))
+        if search_blog:  collect_tasks.append(("blog",  kw, "블로그"))
+        if search_kin:   collect_tasks.append(("kin",   kw, "지식인"))
+        if search_cafe:  collect_tasks.append(("cafe",  kw, "카페"))
         if search_yt and YOUTUBE_API_KEY:
-            r = search_youtube(kw, max_results=min(display_count, 50))
-            all_items.extend(r); collect_log.append(f"유튜브/{kw}/{len(r)}건")
-            step += 1; prog.progress(step / max(total_steps, 1))
-    prog.empty()
+                         collect_tasks.append(("yt",    kw, "유튜브"))
+
+    prog = st.progress(0)
+    prog_text = st.empty()
+    all_items = []; collect_log = []
+    lock_log = []
+
+    def _fetch(task):
+        tp, kw, label = task
+        if tp == "blog":  return label, kw, collect_naver_paged(kw, "blog", display_count)
+        if tp == "kin":   return label, kw, collect_naver_paged(kw, "kin",  display_count)
+        if tp == "cafe":  return label, kw, collect_cafe_paged(kw, display_count)
+        if tp == "yt":    return label, kw, search_youtube(kw, max_results=min(display_count, 50))
+        return label, kw, []
+
+    total_tasks = len(collect_tasks)
+    done = 0
+    # 최대 8개 스레드로 병렬 수집
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(_fetch, t): t for t in collect_tasks}
+        for fut in concurrent.futures.as_completed(futures):
+            label, kw, items = fut.result()
+            all_items.extend(items)
+            collect_log.append(f"{label}/{kw}/{len(items)}건")
+            done += 1
+            prog.progress(done / max(total_tasks, 1))
+            prog_text.markdown(f'<span style="font-size:0.78rem;color:#718096;">수집 중 {done}/{total_tasks} 완료</span>', unsafe_allow_html=True)
+
+    prog.empty(); prog_text.empty()
 
     seen, unique_items = set(), []
     for item in all_items:
@@ -1070,37 +1051,84 @@ if run_btn:
     progress_bar = st.progress(0)
     status_text  = st.empty()
 
-    for i, item in enumerate(filtered):
-        src   = item.get("출처","")
-        title = clean_text(item.get("title",""))
-        desc  = clean_text(item.get("description",""))
-        full  = title + " " + desc
+    # ── ★ 배치 AI 분석 (32개 단위) ────────────────────────
+    BATCH = 32
+    total_f = len(filtered)
 
-        sentiment, score = ai_ensemble(full, model_e, model_r)
-        if score < threshold and sentiment != "중립":
-            sentiment = "중립"
+    for batch_start in range(0, total_f, BATCH):
+        batch = filtered[batch_start: batch_start + BATCH]
+        texts, metas = [], []
+        for item in batch:
+            src   = item.get("출처","")
+            title = clean_text(item.get("title",""))
+            desc  = clean_text(item.get("description",""))
+            full  = title + " " + desc
+            texts.append(full)
+            metas.append((src, item, title))
 
-        date_str = item.get("날짜","") if src == "유튜브" else (
-            lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
-        )(parse_date(item))
+        # 모델 배치 호출
+        e_batch = model_e(texts, batch_size=BATCH, truncation=True, max_length=512) if model_e else [None]*len(texts)
+        r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=512) if model_r else [None]*len(texts)
 
-        prod_code = extract_product_code(full) if src != "유튜브" else ""
-        prod_name = match_product_name(prod_code)
+        for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
+            # 앙상블 (배치 결과 활용)
+            votes = {"호평": 0.0, "악평": 0.0, "중립": 0.0}
+            electra_neg_score = 0.0
+            if e_batch[idx]:
+                try:
+                    for it in e_batch[idx]:
+                        lbl = LABEL_MAP.get(it["label"])
+                        if lbl:
+                            votes[lbl] += it["score"] * 1.6
+                            if lbl == "악평": electra_neg_score = it["score"]
+                except: pass
+            if r_batch[idx]:
+                try:
+                    for it in r_batch[idx]:
+                        lbl = LABEL_MAP.get(it["label"])
+                        if lbl: votes[lbl] += it["score"] * 1.0
+                except: pass
+            rule_lbl, rule_sc = rule_based(full)
+            votes[rule_lbl] += rule_sc * 0.6
+            total_v = sum(votes.values())
+            if total_v == 0:
+                sentiment, score = "중립", 50.0
+            else:
+                best  = max(votes, key=votes.get)
+                score = round(votes[best] / total_v * 100, 1)
+                neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
+                if best == "악평" and not (electra_neg_score >= 0.60 and neg_kw_cnt >= 2):
+                    best = "중립"; score = max(score * 0.7, 45.0)
+                sentiment = best
 
-        results.append({
-            "출처":    src, "검색어": item.get("검색어",""),
-            "소분류":  extract_subcategory(full),
-            "품번":    prod_code, "품명": prod_name,
-            "가격언급":extract_price(full) if src != "유튜브" else "",
-            "title":  title, "link": item.get("link",""),
-            "날짜":   date_str, "감성": sentiment, "확신도": score,
-            "channel":item.get("channel","") or item.get("cafename",""),
-            "views":  item.get("views",""), "likes": item.get("likes",""),
-            "comments":item.get("comments",""), "video_id":item.get("video_id",""),
-        })
+            if score < threshold and sentiment != "중립":
+                sentiment = "중립"
 
-        progress_bar.progress((i+1)/len(filtered))
-        status_text.markdown(f'<span style="font-size:0.78rem;color:#718096;">분석 중 {i+1} / {len(filtered)}</span>', unsafe_allow_html=True)
+            date_str = item.get("날짜","") if src == "유튜브" else (
+                lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
+            )(parse_date(item))
+
+            prod_code = extract_product_code(full) if src != "유튜브" else ""
+            prod_name = match_product_name(prod_code)
+
+            results.append({
+                "출처":    src, "검색어": item.get("검색어",""),
+                "소분류":  extract_subcategory(full),
+                "품번":    prod_code, "품명": prod_name,
+                "가격언급":extract_price(full) if src != "유튜브" else "",
+                "title":  title, "link": item.get("link",""),
+                "날짜":   date_str, "감성": sentiment, "확신도": score,
+                "channel":item.get("channel","") or item.get("cafename",""),
+                "views":  item.get("views",""), "likes": item.get("likes",""),
+                "comments":item.get("comments",""), "video_id":item.get("video_id",""),
+            })
+
+        done_so_far = min(batch_start + BATCH, total_f)
+        progress_bar.progress(done_so_far / total_f)
+        status_text.markdown(
+            f'<span style="font-size:0.78rem;color:#718096;">AI 분석 중 {done_so_far} / {total_f}</span>',
+            unsafe_allow_html=True
+        )
 
     progress_bar.empty(); status_text.empty()
 
