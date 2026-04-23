@@ -1087,20 +1087,10 @@ with st.sidebar:
         <span class="sb-section-text">감성 파라미터 가이드</span>
     </div>
     <div class="param-guide-box">
-        <b>📌 신뢰도(확신도) 조정</b><br>
-        위 <b>신뢰도 조정</b> 슬라이더가 핵심입니다.<br>
-        • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
-        • <code>55~65%</code> → 권장 (정확도 균형)<br>
-        • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
-        <b>📌 룰베이스 키워드 직접 추가</b><br>
-        코드 내 <code>NEGATIVE_KW</code> 리스트에 단어를 추가하면 해당 단어가 포함된 글을 부정으로 가중처리합니다.<br><br>
-        <b>📌 홍보성 글 제외</b><br>
-        <code>PROMO_KW</code> 리스트에 단어 추가 시 홍보성으로 판단해 자동 제외합니다.<br><br>
         <b>📌 AI 모델 가중치 변경</b><br>
         • ELECTRA 가중치: <code>* 1.6</code> (현재)<br>
         • RoBERTa 가중치: <code>* 1.0</code> (현재)<br>
         • 룰베이스 가중치: <code>* 0.8</code> (현재)<br>
-        숫자를 올리면 해당 모델의 영향력이 커집니다.
     </div>
     """, unsafe_allow_html=True)
 
