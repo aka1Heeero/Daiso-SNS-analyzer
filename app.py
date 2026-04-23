@@ -78,6 +78,8 @@ html, body, .stApp {
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
     outline: none !important;
 }
+
+/* ── [FIX 4] 날짜 입력 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
@@ -93,16 +95,26 @@ html, body, .stApp {
 [data-testid="stSidebar"] [data-testid="stDateInput"] {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] > label {
     display: none !important;
 }
+/* [FIX 4] date-label 간격 최소화 */
 .date-label {
     font-size: 0.7rem;
     color: #718096;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
+    margin-top: 0;
     display: block;
-    line-height: 1.2;
+    line-height: 1.1;
+}
+/* [FIX 4] date 컬럼 내부 gap 줄이기 */
+[data-testid="stSidebar"] [data-testid="column"] {
+    gap: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
 }
 
 /* ── 헤더 ── */
@@ -263,7 +275,7 @@ html, body, .stApp {
 }
 .sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; display: block; line-height: 1.5; }
 
-/* ── [FIX 3] 채널 체크박스 — 세로 가운데 정렬 통일 ── */
+/* ── 채널 체크박스 ── */
 .ch-row {
     display: flex;
     align-items: center;
@@ -376,6 +388,24 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
     min-height: unset !important;
     gap: 0 !important;
 }
+
+/* ── [FIX 3] 감성 파라미터 안내 박스 ── */
+.param-guide-box {
+    background: #F0F7FF;
+    border: 1.5px solid #B3D1F5;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    margin: 0.5rem 0 1rem;
+    font-size: 0.78rem;
+    color: #1A202C;
+    line-height: 1.7;
+}
+.param-guide-box b { color: #0066CC; }
+.param-guide-box code {
+    background: #E8F1FB; color: #0052A3;
+    border-radius: 4px; padding: 1px 5px;
+    font-size: 0.74rem; font-family: monospace;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -423,7 +453,6 @@ def load_product_db():
         sh  = gc.open_by_url(st.secrets["GSHEET_URL"])
         df  = pd.DataFrame(sh.sheet1.get_all_records())
         df.columns = [c.strip() for c in df.columns]
-        # [FIX 5] 품번 컬럼을 문자열로 통일, 앞뒤 공백 제거
         if "품번" in df.columns:
             df["품번"] = df["품번"].astype(str).str.strip()
         return df
@@ -433,7 +462,6 @@ def load_product_db():
 
 PRODUCT_DB = load_product_db()
 
-# [FIX 5] 구글시트에 등록된 품번 목록 (숫자만)
 VALID_PRODUCT_CODES = set()
 if not PRODUCT_DB.empty and "품번" in PRODUCT_DB.columns:
     VALID_PRODUCT_CODES = set(PRODUCT_DB["품번"].dropna().astype(str).str.strip().tolist())
@@ -466,7 +494,7 @@ def load_roberta():
 
 # ============================
 # 룰베이스 & 앙상블
-# ============================    조정하자
+# ============================
 NEGATIVE_KW = [
     "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
     "쓰레기","구려","나빠","고장","터졌","망가","깨졌","불편","아쉬워","위험",
@@ -485,6 +513,41 @@ POSITIVE_KW = [
     "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱",
     "갓성비","득템","완전좋","완전 좋","행복","사랑","최애","예쁘다","예쁜",
 ]
+
+# ============================
+# [FIX 1] 홍보성 글 제외 키워드
+# ============================
+PROMO_KW = [
+    "다이소 매장", "다이소 오픈", "다이소 신상", "다이소 신제품", "다이소 근처",
+    "다이소 위치", "다이소 영업시간", "다이소 매장 위치", "다이소 점포",
+    "다이소 방문", "다이소 주차", "다이소에서 구입", "다이소 쇼핑",
+    "홍보", "광고", "제품을 받았습니다", "제공받아", "협찬", "무료로 받",
+    "내돈내산 아닌", "리뷰어", "체험단", "서포터즈", "내돈내산아님",
+    "다이소 하울", "다이소 추천템", "다이소 인기템", "다이소 꿀템 추천",
+    "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천",
+]
+
+# ============================
+# [FIX 1] 홍보성 글 판단 함수
+# ============================
+def is_promotional(item: dict) -> bool:
+    """
+    제목+본문에 홍보성 키워드가 포함되어 있고,
+    부정 키워드가 1개도 없으면 홍보성 글로 판단해 제외.
+    """
+    title = clean_text(item.get("title", ""))
+    desc  = clean_text(item.get("description", ""))
+    full  = title + " " + desc
+
+    promo_hit = sum(1 for kw in PROMO_KW if kw in full)
+    neg_hit   = sum(1 for kw in NEGATIVE_KW if kw in full)
+
+    # 홍보 키워드 1개 이상 + 부정 키워드 0개 → 홍보성으로 제외
+    if promo_hit >= 1 and neg_hit == 0:
+        return True
+    return False
+
+
 LABEL_MAP = {
     "positive":"긍정","pos":"긍정","LABEL_2":"긍정","긍정":"긍정",
     "negative":"부정","neg":"부정","LABEL_0":"부정","부정":"부정",
@@ -517,12 +580,11 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
                 if lbl: votes[lbl] += it["score"] * 1.0
         except Exception: pass
     rule_lbl, rule_sc = rule_based(text)
-    votes[rule_lbl] += rule_sc * 0.8  # [FIX 6] 룰베이스 가중치 상향
+    votes[rule_lbl] += rule_sc * 0.8
     total = sum(votes.values())
     if total == 0: return "중립", 50
     best  = max(votes, key=votes.get)
-    score = round(votes[best] / total * 100)  # [FIX 2] 정수 변환
-    # [FIX 6] 부정 억제 조건 완화: ELECTRA 임계값 낮추고 키워드 1개도 허용
+    score = round(votes[best] / total * 100)
     neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in text)
     if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
         best = "중립"; score = max(round(score * 0.7), 45)
@@ -530,23 +592,17 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
 
 
 # ============================
-# [FIX 1] 키워드 관련성 필터 — 반드시 '다이소' 포함 확인
+# 다이소 관련성 필터
 # ============================
 DAISO_VARIANTS = ["다이소", "DAISO", "daiso"]
 
 def is_daiso_related(item: dict) -> bool:
-    """제목+본문에 다이소 관련 키워드가 포함되어 있는지 확인"""
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
     full  = (title + " " + desc).upper()
     return any(v.upper() in full for v in DAISO_VARIANTS)
 
 def build_naver_query(raw_keyword: str) -> str:
-    """
-    [FIX 1] 검색어에 '다이소'가 없으면 자동으로 앞에 붙여서
-    네이버 API에 전달되는 쿼리를 만든다.
-    예: '불량' → '다이소 불량'
-    """
     kw = raw_keyword.strip()
     has_daiso = any(v in kw for v in DAISO_VARIANTS)
     if not has_daiso:
@@ -555,7 +611,7 @@ def build_naver_query(raw_keyword: str) -> str:
 
 
 # ============================
-# 네이버 검색
+# 네이버 검색 (블로그·지식인)
 # ============================
 def search_naver(query: str, search_type: str = "blog", display: int = 100) -> list:
     url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
@@ -569,21 +625,99 @@ def search_naver(query: str, search_type: str = "blog", display: int = 100) -> l
     for item in items: item["출처"] = label; item["검색어"] = query
     return items
 
-def search_naver_cafe(query: str, display: int = 100) -> list:
-    url     = "https://openapi.naver.com/v1/search/cafearticle.json"
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params  = {"query": query, "display": min(display, 100), "sort": "date"}
-    try:
-        items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
-    except Exception:
-        items = []
-    result = []
-    for item in items:
-        cn = item.get("cafename", "")
-        if "다이소" in cn or "DAISO" in cn.upper():
-            item["출처"] = "카페"; item["검색어"] = query; item["channel"] = cn
-            result.append(item)
-    return result
+
+# ============================
+# [FIX 2] 카페·지식인 페이징 수정
+# 네이버 API: cafearticle, kin 모두 /v1/search/{type}.json 동일 엔드포인트
+# start 파라미터 최대 1000까지 지원, display 최대 100
+# 카페는 cafename 필터 제거 → 다이소 관련 카페글 전체 수집 후 is_daiso_related로 필터
+# ============================
+def collect_naver_paged(query: str, search_type: str, total: int) -> list:
+    """
+    블로그(blog) / 지식인(kin) 페이징 수집
+    start 최대 1000, 한 번에 최대 100건
+    """
+    all_items = []
+    per_page  = 100
+    start_idx = 1
+    label = "블로그" if search_type == "blog" else "지식인"
+
+    while len(all_items) < total:
+        if start_idx > 1000:       # 네이버 API 하드 제한
+            break
+        remaining = total - len(all_items)
+        fetch_cnt = min(per_page, remaining, 1000 - start_idx + 1)
+        if fetch_cnt <= 0:
+            break
+
+        url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
+        headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+        params  = {"query": query, "display": fetch_cnt, "start": start_idx, "sort": "date"}
+        try:
+            resp  = requests.get(url, headers=headers, params=params, timeout=10)
+            items = resp.json().get("items", [])
+        except Exception:
+            break
+
+        if not items:
+            break
+
+        for item in items:
+            item["출처"]   = label
+            item["검색어"] = query
+        all_items.extend(items)
+        start_idx += fetch_cnt
+
+        if len(items) < fetch_cnt:   # 결과가 더 이상 없음
+            break
+
+    return all_items[:total]
+
+
+def collect_cafe_paged(query: str, total: int) -> list:
+    """
+    [FIX 2] 카페(cafearticle) 페이징 수집
+    - cafename 필터 제거: 다이소 공식 카페 외에도 다이소 관련 일반 카페글 모두 수집
+    - is_daiso_related()로 최종 필터링
+    - start 최대 1000
+    """
+    all_items = []
+    per_page  = 100
+    start_idx = 1
+
+    while len(all_items) < total:
+        if start_idx > 1000:
+            break
+        remaining = total - len(all_items)
+        fetch_cnt = min(per_page, remaining, 1000 - start_idx + 1)
+        if fetch_cnt <= 0:
+            break
+
+        url     = "https://openapi.naver.com/v1/search/cafearticle.json"
+        headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+        params  = {"query": query, "display": fetch_cnt, "start": start_idx, "sort": "date"}
+        try:
+            resp  = requests.get(url, headers=headers, params=params, timeout=10)
+            items = resp.json().get("items", [])
+        except Exception:
+            break
+
+        if not items:
+            break
+
+        for item in items:
+            item["출처"]   = "카페"
+            item["검색어"] = query
+            # cafename이 있으면 channel로도 저장
+            item["channel"] = item.get("cafename", "")
+
+        all_items.extend(items)
+        start_idx += fetch_cnt
+
+        if len(items) < fetch_cnt:
+            break
+
+    return all_items[:total]
 
 
 # ============================
@@ -659,7 +793,7 @@ def clean_text(text: str) -> str:
 
 
 # ============================
-# [FIX 5] 품번 추출 — DB에 등록된 숫자 품번만 인정
+# 품번 추출
 # ============================
 DATE_PATS = [
     r'\b20\d{6}\b', r'\b\d{4}[-./]\d{2}[-./]\d{2}\b',
@@ -672,22 +806,14 @@ def is_date_like(t):
     return bool(re.fullmatch(r'\d{6,8}', t.strip()))
 
 def extract_product_code(text):
-    """
-    [FIX 5] 순수 숫자(3~6자리) 품번만 추출하고,
-    구글시트 DB에 실제로 등록된 품번만 반환한다.
-    영문+숫자 혼합 패턴은 제외.
-    """
-    # 순수 숫자 3~6자리만 추출
     raw_nums = re.findall(r'\b(\d{3,6})\b', text)
     codes = []
     for c in raw_nums:
         if is_date_like(c):
             continue
-        # DB에 등록된 품번인지 확인
         if VALID_PRODUCT_CODES and c in VALID_PRODUCT_CODES:
             codes.append(c)
         elif not VALID_PRODUCT_CODES:
-            # DB가 비어있으면 일단 모두 수집
             codes.append(c)
     return ", ".join(dict.fromkeys(codes)) if codes else ""
 
@@ -761,7 +887,6 @@ def icon(label: str) -> str:
     return f'<span class="section-title-icon">{label}</span>'
 
 def fmt_score(score) -> str:
-    """[FIX 2] 확신도 정수%로 표기"""
     try:
         return f"{int(round(float(score)))}%"
     except:
@@ -796,7 +921,7 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">DAISO</div>
+        ">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
@@ -835,12 +960,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # [FIX 3] 채널 체크박스 — 체크박스+아이콘+텍스트를 한 행에 세로 가운데 정렬
-    # 2열 그리드로 배치
     col_left, col_right = st.columns(2)
 
     with col_left:
-        # 블로그
         cb_col, icon_col = st.columns([1, 4])
         with cb_col:
             search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
@@ -850,7 +972,6 @@ with st.sidebar:
                 <span class="ch-label">블로그</span>
             </div>""", unsafe_allow_html=True)
 
-        # 카페
         cb_col2, icon_col2 = st.columns([1, 4])
         with cb_col2:
             search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
@@ -861,7 +982,6 @@ with st.sidebar:
             </div>""", unsafe_allow_html=True)
 
     with col_right:
-        # 지식인
         cb_col3, icon_col3 = st.columns([1, 4])
         with cb_col3:
             search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
@@ -871,7 +991,6 @@ with st.sidebar:
                 <span class="ch-label">지식인</span>
             </div>""", unsafe_allow_html=True)
 
-        # 유튜브
         cb_col4, icon_col4 = st.columns([1, 4])
         with cb_col4:
             search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
@@ -897,7 +1016,6 @@ with st.sidebar:
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
                                   height=95, label_visibility="collapsed",
                                   placeholder="줄바꿈으로 구분 · 최대 10개")
-    # [FIX 1] 다이소 자동 추가 안내
     st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개<br>※ \'다이소\' 없으면 자동 추가됩니다</span>', unsafe_allow_html=True)
 
     # ── ③ 수집 기간 ─────────────────────────────────────────
@@ -914,7 +1032,8 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    dc1, dc2 = st.columns(2)
+    # [FIX 4] 날짜 간격 최소화: gap=0 스타일 컬럼 + margin 제거
+    dc1, dc2 = st.columns(2, gap="small")
     with dc1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
         start_date = st.date_input("시작일", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
@@ -961,6 +1080,30 @@ with st.sidebar:
     )
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
+    # ── [FIX 3] 감성 파라미터 안내 ────────────────────────────
+    st.markdown("""
+    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
+        <div class="sb-section-icon">⚙</div>
+        <span class="sb-section-text">감성 파라미터 가이드</span>
+    </div>
+    <div class="param-guide-box">
+        <b>📌 신뢰도(확신도) 조정</b><br>
+        위 <b>신뢰도 조정</b> 슬라이더가 핵심입니다.<br>
+        • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
+        • <code>55~65%</code> → 권장 (정확도 균형)<br>
+        • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
+        <b>📌 룰베이스 키워드 직접 추가</b><br>
+        코드 내 <code>NEGATIVE_KW</code> 리스트에 단어를 추가하면 해당 단어가 포함된 글을 부정으로 가중처리합니다.<br><br>
+        <b>📌 홍보성 글 제외</b><br>
+        <code>PROMO_KW</code> 리스트에 단어 추가 시 홍보성으로 판단해 자동 제외합니다.<br><br>
+        <b>📌 AI 모델 가중치 변경</b><br>
+        • ELECTRA 가중치: <code>* 1.6</code> (현재)<br>
+        • RoBERTa 가중치: <code>* 1.0</code> (현재)<br>
+        • 룰베이스 가중치: <code>* 0.8</code> (현재)<br>
+        숫자를 올리면 해당 모델의 영향력이 커집니다.
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     run_btn = st.button("분석 시작", use_container_width=True)
 
@@ -977,73 +1120,34 @@ if run_btn:
     if start_date > end_date:
         st.error("시작일이 종료일보다 늦습니다. 날짜를 확인해주세요."); st.stop()
 
-    # [FIX 1] 쿼리 빌드 — 다이소 자동 추가
     keywords = [build_naver_query(k) for k in keywords_raw]
 
     with st.spinner("AI 앙상블 모델 초기화 중... (KR-ELECTRA + KLUE-RoBERTa)"):
         model_e = load_electra()
         model_r = load_roberta()
 
-    # ── 수집 함수 ──────────────────────────────────────────
-    def collect_naver_paged(query, search_type, total):
-        all_items = []
-        fetched = 0; start_idx = 1; per_page = 100
-        while fetched < total:
-            url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
-            headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-            params  = {"query": query, "display": per_page, "start": start_idx, "sort": "date"}
-            try:
-                items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
-            except Exception: break
-            if not items: break
-            label = "블로그" if search_type == "blog" else "지식인"
-            for item in items: item["출처"] = label; item["검색어"] = query
-            all_items.extend(items); fetched += len(items); start_idx += per_page
-            if len(items) < per_page: break
-        return all_items[:total]
-
-    def collect_cafe_paged(query, total):
-        all_items = []
-        fetched = 0; start_idx = 1; per_page = 100
-        while fetched < total:
-            url     = "https://openapi.naver.com/v1/search/cafearticle.json"
-            headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-            params  = {"query": query, "display": per_page, "start": start_idx, "sort": "date"}
-            try:
-                items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
-            except Exception: break
-            if not items: break
-            for item in items:
-                cn = item.get("cafename","")
-                if "다이소" in cn or "DAISO" in cn.upper():
-                    item["출처"] = "카페"; item["검색어"] = query; item["channel"] = cn
-                    all_items.append(item)
-            fetched += len(items); start_idx += per_page
-            if len(items) < per_page: break
-        return all_items[:total]
-
-    import concurrent.futures
-
+    # ── 수집 태스크 구성 ──────────────────────────────────────
     collect_tasks = []
     for kw in keywords:
-        if search_blog:  collect_tasks.append(("blog",  kw, "블로그"))
-        if search_kin:   collect_tasks.append(("kin",   kw, "지식인"))
-        if search_cafe:  collect_tasks.append(("cafe",  kw, "카페"))
+        if search_blog: collect_tasks.append(("blog", kw, "블로그"))
+        if search_kin:  collect_tasks.append(("kin",  kw, "지식인"))
+        if search_cafe: collect_tasks.append(("cafe", kw, "카페"))
         if search_yt and YOUTUBE_API_KEY:
-                         collect_tasks.append(("yt",    kw, "유튜브"))
+                        collect_tasks.append(("yt",   kw, "유튜브"))
 
-    prog = st.progress(0)
+    prog      = st.progress(0)
     prog_text = st.empty()
     all_items = []; collect_log = []
 
     def _fetch(task):
         tp, kw, label = task
-        if tp == "blog":  return label, kw, collect_naver_paged(kw, "blog", display_count)
-        if tp == "kin":   return label, kw, collect_naver_paged(kw, "kin",  display_count)
-        if tp == "cafe":  return label, kw, collect_cafe_paged(kw, display_count)
-        if tp == "yt":    return label, kw, search_youtube(kw, max_results=min(display_count, 50))
+        if tp == "blog": return label, kw, collect_naver_paged(kw, "blog", display_count)
+        if tp == "kin":  return label, kw, collect_naver_paged(kw, "kin",  display_count)
+        if tp == "cafe": return label, kw, collect_cafe_paged(kw, display_count)
+        if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
         return label, kw, []
 
+    import concurrent.futures
     total_tasks = len(collect_tasks)
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -1058,16 +1162,26 @@ if run_btn:
 
     prog.empty(); prog_text.empty()
 
+    # ── 중복 제거 ──────────────────────────────────────────────
     seen, unique_items = set(), []
     for item in all_items:
         lnk = item.get("link","")
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
-    # [FIX 1] 다이소 관련 없는 결과 추가 필터링
+    # ── 다이소 관련성 필터 (카페는 제외 — 카페글은 이미 query에 다이소 포함) ──
     before_rel = len(unique_items)
-    unique_items = [it for it in unique_items if is_daiso_related(it) or it.get("출처") == "카페"]
+    unique_items = [
+        it for it in unique_items
+        if it.get("출처") == "카페" or is_daiso_related(it)
+    ]
     rel_excluded = before_rel - len(unique_items)
 
+    # ── [FIX 1] 홍보성 글 제외 ─────────────────────────────────
+    before_promo = len(unique_items)
+    unique_items = [it for it in unique_items if not is_promotional(it)]
+    promo_excluded = before_promo - len(unique_items)
+
+    # ── 유심 관련 제외 ─────────────────────────────────────────
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
         "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심","자","정력","정액"
@@ -1080,13 +1194,16 @@ if run_btn:
     unique_items = [it for it in unique_items if not is_usim_related(it)]
     usim_excluded = before_usim - len(unique_items)
 
+    # ── 날짜 필터 ──────────────────────────────────────────────
     filtered = filter_by_date(unique_items, start_date, end_date)
     if not filtered:
         st.warning("해당 기간에 결과가 없습니다. 날짜 범위나 검색어를 확인해주세요."); st.stop()
 
+    # ── 수집 완료 안내 ─────────────────────────────────────────
     notes = []
-    if rel_excluded > 0:  notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
-    if usim_excluded > 0: notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
+    if rel_excluded > 0:    notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
+    if promo_excluded > 0:  notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
+    if usim_excluded > 0:   notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
     note_str = " &nbsp;·&nbsp; ".join(notes)
     if note_str: note_str = " &nbsp;·&nbsp; " + note_str
 
@@ -1099,11 +1216,12 @@ if run_btn:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── AI 분석 ────────────────────────────────────────────────
     results = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
 
-    BATCH = 32
+    BATCH   = 32
     total_f = len(filtered)
 
     for batch_start in range(0, total_f, BATCH):
@@ -1139,16 +1257,15 @@ if run_btn:
                 except: pass
 
             rule_lbl, rule_sc = rule_based(full)
-            votes[rule_lbl] += rule_sc * 0.8  # [FIX 6] 룰베이스 가중치 상향
+            votes[rule_lbl] += rule_sc * 0.8
 
             total_v = sum(votes.values())
             if total_v == 0:
                 sentiment, score = "중립", 50
             else:
                 best  = max(votes, key=votes.get)
-                score = round(votes[best] / total_v * 100)  # [FIX 2] 정수
+                score = round(votes[best] / total_v * 100)
                 neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
-                # [FIX 6] 부정 억제 조건 완화
                 if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
                     best = "중립"; score = max(round(score * 0.7), 45)
                 sentiment = best
@@ -1170,7 +1287,7 @@ if run_btn:
                 "가격언급":extract_price(full) if src != "유튜브" else "",
                 "title":  title, "link": item.get("link",""),
                 "날짜":   date_str, "감성": sentiment,
-                "확신도": score,  # [FIX 2] 이미 정수
+                "확신도": score,
                 "channel":item.get("channel","") or item.get("cafename",""),
                 "views":  item.get("views",""), "likes": item.get("likes",""),
                 "comments":item.get("comments",""), "video_id":item.get("video_id",""),
@@ -1185,6 +1302,7 @@ if run_btn:
 
     progress_bar.empty(); status_text.empty()
 
+    # ── 탭 렌더링 ───────────────────────────────────────────────
     tab_dash, tab_blog, tab_kin, tab_cafe, tab_yt = st.tabs([
         "📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"
     ])
