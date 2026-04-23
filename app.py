@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import requests
 import openpyxl
 import re
@@ -15,7 +15,7 @@ from collections import Counter
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="DAISO SNS-LENS",
+    page_title="DAISO SNS ISSUE FINDER",
     page_icon="🔵",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -387,8 +387,8 @@ def check_password():
     st.markdown("""
     <div class="login-wrap">
         <div class="login-icon">🔵</div>
-        <div class="login-title">DAISO SNS-LENS</div>
-        <div class="login-sub">SNS 불만/감성 AI분석 시스템</div>
+        <div class="login-title">DAISO SNS ISSUE FINDER</div>
+        <div class="login-sub">다이소 SNS 상품불량 수집 AI시스템</div>
     </div>
     """, unsafe_allow_html=True)
     col = st.columns([1, 2, 1])[1]
@@ -466,7 +466,7 @@ def load_roberta():
 
 # ============================
 # 룰베이스 & 앙상블
-# ============================
+# ============================    조정하자
 NEGATIVE_KW = [
     "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
     "쓰레기","구려","나빠","고장","터졌","망가","깨졌","불편","아쉬워","위험",
@@ -486,21 +486,21 @@ POSITIVE_KW = [
     "갓성비","득템","완전좋","완전 좋","행복","사랑","최애","예쁘다","예쁜",
 ]
 LABEL_MAP = {
-    "positive":"호평","pos":"호평","LABEL_2":"호평","호평":"호평",
-    "negative":"악평","neg":"악평","LABEL_0":"악평","악평":"악평",
+    "positive":"긍정","pos":"긍정","LABEL_2":"긍정","긍정":"긍정",
+    "negative":"부정","neg":"부정","LABEL_0":"부정","부정":"부정",
     "neutral":"중립","neu":"중립","LABEL_1":"중립","중립":"중립",
-    "부정":"악평","긍정":"호평",
+    "부정":"부정","긍정":"긍정",
 }
 
 def rule_based(text: str):
     neg = sum(1 for kw in NEGATIVE_KW if kw in text)
     pos = sum(1 for kw in POSITIVE_KW if kw in text)
-    if neg > pos:  return "악평", min(0.65 + neg * 0.08, 0.98)
-    if pos > neg:  return "호평", min(0.60 + pos * 0.08, 0.98)
+    if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
+    if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
 
 def ai_ensemble(text: str, model_e, model_r) -> tuple:
-    votes = {"호평": 0.0, "악평": 0.0, "중립": 0.0}
+    votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
     electra_neg_score = 0.0
     if model_e:
         try:
@@ -508,7 +508,7 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
                 lbl = LABEL_MAP.get(it["label"])
                 if lbl:
                     votes[lbl] += it["score"] * 1.6
-                    if lbl == "악평": electra_neg_score = it["score"]
+                    if lbl == "부정": electra_neg_score = it["score"]
         except Exception: pass
     if model_r:
         try:
@@ -522,9 +522,9 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
     if total == 0: return "중립", 50
     best  = max(votes, key=votes.get)
     score = round(votes[best] / total * 100)  # [FIX 2] 정수 변환
-    # [FIX 6] 악평 억제 조건 완화: ELECTRA 임계값 낮추고 키워드 1개도 허용
+    # [FIX 6] 부정 억제 조건 완화: ELECTRA 임계값 낮추고 키워드 1개도 허용
     neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in text)
-    if best == "악평" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
+    if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
         best = "중립"; score = max(round(score * 0.7), 45)
     return best, score
 
@@ -729,7 +729,7 @@ def match_product_name(code):
 # 엑셀 생성
 # ============================
 def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
-    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS LENS"
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS ISSUE FINDER"
     headers = ["출처","검색어","소분류","품번","품명","가격언급","제목","링크","날짜","감성","확신도(%)","채널/카페명","조회수","좋아요","댓글수"]
     ws.append(headers)
     hf   = openpyxl.styles.Font(bold=True, color="0066CC", name="Malgun Gothic")
@@ -738,8 +738,8 @@ def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
     for c in range(1, len(headers)+1):
         cell = ws.cell(1, c); cell.font = hf; cell.fill = hfil; cell.border = hbrd
         cell.alignment = openpyxl.styles.Alignment(horizontal="center")
-    col_bg  = {"호평":"E8F5EE","악평":"FDEEEE","중립":"FFFBE8"}
-    col_txt = {"호평":"16A34A","악평":"DC2626","중립":"CA8A04"}
+    col_bg  = {"긍정":"E8F5EE","부정":"FDEEEE","중립":"FFFBE8"}
+    col_txt = {"긍정":"16A34A","부정":"DC2626","중립":"CA8A04"}
     for ri, row in enumerate(data, 2):
         ws.append([row.get(k,"") for k in ["출처","검색어","소분류","품번","품명","가격언급","title","link","날짜","감성","확신도","channel","views","likes","comments"]])
         s = row.get("감성","")
@@ -755,7 +755,7 @@ def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
 # ============================
 # 헬퍼
 # ============================
-SENT_BADGE = {"호평":"badge-pos","악평":"badge-neg","중립":"badge-neu"}
+SENT_BADGE = {"긍정":"badge-pos","부정":"badge-neg","중립":"badge-neu"}
 
 def icon(label: str) -> str:
     return f'<span class="section-title-icon">{label}</span>'
@@ -800,7 +800,7 @@ st.markdown("""
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS-LENS · 불만 감성분석</div>
+        <div class="header-title">SNS ISSUE FINDER · 불만 감성분석</div>
         <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
     </div>
 </div>
@@ -817,7 +817,7 @@ with st.sidebar:
             <span style="color:#FFFFFF;font-size:0.65rem;font-weight:900;letter-spacing:0.05em;font-family:'Inter',sans-serif;">D</span>
         </div>
         <div>
-            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO SNS-LENS</div>
+            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">SNS ISSUE FINDER</div>
             <div style="font-size:0.68rem;color:#718096;">Created by 데이터분석팀</div>
         </div>
     </div>
@@ -831,7 +831,7 @@ with st.sidebar:
                 <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
             </svg>
         </div>
-        <span class="sb-section-text">수집 채널</span>
+        <span class="sb-section-text">CHANNEL</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -938,11 +938,11 @@ with st.sidebar:
     display_count = st.number_input(
         "", min_value=10, max_value=5000, value=100, step=10,
         label_visibility="collapsed",
-        help="키워드당 수집할 최대 건수 (10 ~ 5,000)"
+        help="데이터 수집건수 (최소 10 ~ 최대 5,000)"
     )
-    st.markdown('<span class="sb-hint">키워드당 최대 건수 · 10~5,000</span>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">데이터 수집건수 · 10 ~ 5,000</span>', unsafe_allow_html=True)
 
-    # ── ⑤ 악평 확신도 ───────────────────────────────────────
+    # ── ⑤ 부정 확신도 ───────────────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
@@ -951,13 +951,13 @@ with st.sidebar:
                 <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
         </div>
-        <span class="sb-section-text">악평 확신도 임계값</span>
+        <span class="sb-section-text"> 확신</span>
     </div>
     """, unsafe_allow_html=True)
     threshold = st.number_input(
         "", min_value=40, max_value=95, value=55, step=5,
         label_visibility="collapsed",
-        help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 악평으로 등록"
+        help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
@@ -1121,7 +1121,7 @@ if run_btn:
         r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=512) if model_r else [None]*len(texts)
 
         for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
-            votes = {"호평": 0.0, "악평": 0.0, "중립": 0.0}
+            votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
             electra_neg_score = 0.0
             if e_batch[idx]:
                 try:
@@ -1129,7 +1129,7 @@ if run_btn:
                         lbl = LABEL_MAP.get(it["label"])
                         if lbl:
                             votes[lbl] += it["score"] * 1.6
-                            if lbl == "악평": electra_neg_score = it["score"]
+                            if lbl == "부정": electra_neg_score = it["score"]
                 except: pass
             if r_batch[idx]:
                 try:
@@ -1148,8 +1148,8 @@ if run_btn:
                 best  = max(votes, key=votes.get)
                 score = round(votes[best] / total_v * 100)  # [FIX 2] 정수
                 neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
-                # [FIX 6] 악평 억제 조건 완화
-                if best == "악평" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
+                # [FIX 6] 부정 억제 조건 완화
+                if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
                     best = "중립"; score = max(round(score * 0.7), 45)
                 sentiment = best
 
@@ -1190,8 +1190,8 @@ if run_btn:
     ])
 
     total = len(results)
-    pos   = sum(1 for r in results if r["감성"]=="호평")
-    neg   = sum(1 for r in results if r["감성"]=="악평")
+    pos   = sum(1 for r in results if r["감성"]=="긍정")
+    neg   = sum(1 for r in results if r["감성"]=="부정")
     neu   = sum(1 for r in results if r["감성"]=="중립")
 
     all_subs = []
@@ -1209,7 +1209,7 @@ if run_btn:
 
     date_neg = {}
     for r in results:
-        if r["감성"] == "악평" and r.get("날짜"):
+        if r["감성"] == "부정" and r.get("날짜"):
             month = r["날짜"][:7]
             date_neg[month] = date_neg.get(month, 0) + 1
 
@@ -1218,8 +1218,8 @@ if run_btn:
         c1, c2, c3, c4 = st.columns(4)
         for col, cls, lbl, val, pct, ic_txt in [
             (c1,"total","전체 수집",  str(total), "100%",                                    "전체"),
-            (c2,"pos",  "호평",      str(pos),   f"{round(pos/total*100) if total else 0}%","호평"),
-            (c3,"neg",  "악평",      str(neg),   f"{round(neg/total*100) if total else 0}%","악평"),
+            (c2,"pos",  "긍정",      str(pos),   f"{round(pos/total*100) if total else 0}%","긍정"),
+            (c3,"neg",  "부정",      str(neg),   f"{round(neg/total*100) if total else 0}%","부정"),
             (c4,"neu",  "중립",      str(neu),   f"{round(neu/total*100) if total else 0}%","중립"),
         ]:
             with col:
@@ -1247,15 +1247,15 @@ if run_btn:
                 </div>""", unsafe_allow_html=True)
 
         if date_neg:
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 악평 건수</span></div>', unsafe_allow_html=True)
-            chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","악평수"]).sort_values("월")
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 부정 건수</span></div>', unsafe_allow_html=True)
+            chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","부정수"]).sort_values("월")
             chart = (
                 alt.Chart(chart_df)
                 .mark_bar(color="#0066CC", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
                 .encode(
                     x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0, labelFontSize=12)),
-                    y=alt.Y("악평수:Q", axis=alt.Axis(title="악평 건수", titleFontSize=11)),
-                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("악평수:Q", title="건수")]
+                    y=alt.Y("부정수:Q", axis=alt.Axis(title="부정 건수", titleFontSize=11)),
+                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("부정수:Q", title="건수")]
                 )
                 .properties(height=220)
                 .configure_view(strokeWidth=0)
@@ -1280,8 +1280,8 @@ if run_btn:
                 html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("악평")} <span style="font-size:0.95rem;font-weight:600;">주요 악평 글 목록</span></div>', unsafe_allow_html=True)
-        neg_results = [r for r in results if r["감성"] == "악평"]
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("부정")} <span style="font-size:0.95rem;font-weight:600;">주요 부정 글 목록</span></div>', unsafe_allow_html=True)
+        neg_results = [r for r in results if r["감성"] == "부정"]
         if neg_results:
             for r in neg_results[:20]:
                 _b    = SENT_BADGE.get(r["감성"], "")
@@ -1304,34 +1304,34 @@ if run_btn:
                 )
                 st.markdown(_html, unsafe_allow_html=True)
         else:
-            st.info("악평으로 분류된 글이 없습니다.")
+            st.info("부정으로 분류된 글이 없습니다.")
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("↓")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span></div>', unsafe_allow_html=True)
         dl1, dl2 = st.columns(2)
         with dl1:
             buf = create_excel(results, start_date, end_date)
             st.download_button("📥 EXCEL 다운로드", buf,
-                f"LENS_{start_date}_{end_date}.xlsx",
+                f"ISSUE_{start_date}_{end_date}.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
         with dl2:
             csv = pd.DataFrame(results).to_csv(index=False, encoding="utf-8-sig")
             st.download_button("📥 CSV 다운로드", csv.encode("utf-8-sig"),
-                f"LENS_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
+                f"ISSUE_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
     def render_detail_tab(src_results, src_name):
         if not src_results:
             st.info(f"{src_name} 수집 결과가 없습니다."); return
         t  = len(src_results)
-        p  = sum(1 for r in src_results if r["감성"]=="호평")
-        n  = sum(1 for r in src_results if r["감성"]=="악평")
+        p  = sum(1 for r in src_results if r["감성"]=="긍정")
+        n  = sum(1 for r in src_results if r["감성"]=="부정")
         ne = sum(1 for r in src_results if r["감성"]=="중립")
 
         c1,c2,c3,c4 = st.columns(4)
         for col, cls, lbl, val, ic_txt in [
             (c1,"total","전체",str(t),"전체"),
-            (c2,"pos","호평",str(p),"호평"),
-            (c3,"neg","악평",str(n),"악평"),
+            (c2,"pos","긍정",str(p),"긍정"),
+            (c3,"neg","부정",str(n),"부정"),
             (c4,"neu","중립",str(ne),"중립"),
         ]:
             with col:
@@ -1349,13 +1349,13 @@ if run_btn:
         kw_stats = {}
         for r in src_results:
             kw = r.get("검색어","")
-            kw_stats.setdefault(kw, {"호평":0,"악평":0,"중립":0})
+            kw_stats.setdefault(kw, {"긍정":0,"부정":0,"중립":0})
             kw_stats[kw][r["감성"]] += 1
         kw_rows = []
         for kw, s in kw_stats.items():
             t2 = sum(s.values())
-            kw_rows.append({"검색어":kw,"호평":s["호평"],"악평":s["악평"],"중립":s["중립"],
-                            "합계":t2,"악평률(%)":round(s["악평"]/t2*100,1) if t2 else 0})
+            kw_rows.append({"검색어":kw,"긍정":s["긍정"],"부정":s["부정"],"중립":s["중립"],
+                            "합계":t2,"부정률(%)":round(s["부정"]/t2*100,1) if t2 else 0})
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("검색")} <span style="font-size:0.95rem;font-weight:600;">검색어별 분포</span></div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(kw_rows), use_container_width=True, hide_index=True, height=160)
 
@@ -1384,7 +1384,7 @@ if run_btn:
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
         st.download_button(f"📥 {src_name} CSV 다운로드", src_csv.encode("utf-8-sig"),
-            f"LENS_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
+            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
     with tab_blog:
         render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
@@ -1404,14 +1404,14 @@ if run_btn:
                 st.info("유튜브 수집 결과가 없습니다.")
         else:
             yt_t  = len(yt_results)
-            yt_p  = sum(1 for r in yt_results if r["감성"]=="호평")
-            yt_n  = sum(1 for r in yt_results if r["감성"]=="악평")
+            yt_p  = sum(1 for r in yt_results if r["감성"]=="긍정")
+            yt_n  = sum(1 for r in yt_results if r["감성"]=="부정")
             yt_ne = sum(1 for r in yt_results if r["감성"]=="중립")
             yc1,yc2,yc3,yc4 = st.columns(4)
             for col, cls, lbl, val, ic_txt in [
                 (yc1,"total","영상",str(yt_t),"영상"),
-                (yc2,"pos","호평",str(yt_p),"호평"),
-                (yc3,"neg","악평",str(yt_n),"악평"),
+                (yc2,"pos","긍정",str(yt_p),"긍정"),
+                (yc3,"neg","부정",str(yt_n),"부정"),
                 (yc4,"neu","중립",str(yt_ne),"중립"),
             ]:
                 with col:
@@ -1460,6 +1460,6 @@ if run_btn:
 
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
-        <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS-LENS · KR-ELECTRA × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
+        <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS ISSUE FINDER · KR-ELECTRA × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
     </div>
     """, unsafe_allow_html=True)
