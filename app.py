@@ -723,7 +723,20 @@ st.markdown("""
             flex-shrink:0;
             box-shadow:0 2px 6px rgba(0,102,204,0.35);
         ">
-        </svg>
+            <svg width="30" height="20" viewBox="0 0 60 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- D -->
+                <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z
+                         M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
+                <!-- A -->
+                <path d="M18 18 L24 2 L30 18 M20.5 12 H27.5" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <!-- I -->
+                <rect x="33" y="2" width="3.5" height="16" rx="1" fill="#FFFFFF"/>
+                <!-- S -->
+                <path d="M40 15 Q40 18 44 18 Q48 18 48 14.5 Q48 11 44 10 Q40 9 40 5.5 Q40 2 44 2 Q48 2 48 5"
+                      stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <!-- O -->
+                <ellipse cx="54" cy="10" rx="5" ry="8" stroke="#FFFFFF" stroke-width="3" fill="none"/>
+            </svg>
         </div>
         <div style="
             font-size:1.35rem; font-weight:900;
@@ -771,65 +784,56 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # ── 2번 수정: [아이콘][라벨][체크박스] 인라인 배치 ──
-  # 1행: 블로그 / 지식인
-col1, col2 = st.columns(2)
-
-with col1:
-    c1_1, c1_2 = st.columns([3, 1])
-    with c1_1:
+    # 블로그
+    cb1, cb2 = st.columns([5, 1])
+    with cb1:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
             </div>
             <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">블로그</span>
         </div>""", unsafe_allow_html=True)
-    with c1_2:
+    with cb2:
         search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
 
-with col2:
-    c2_1, c2_2 = st.columns([3, 1])
-    with c2_1:
+    # 지식인
+    cb3, cb4 = st.columns([5, 1])
+    with cb3:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
             </div>
             <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">지식인</span>
         </div>""", unsafe_allow_html=True)
-    with c2_2:
+    with cb4:
         search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
 
-
-# 2행: 카페 / 유튜브
-col3, col4 = st.columns(2)
-
-with col3:
-    c3_1, c3_2 = st.columns([3, 1])
-    with c3_1:
+    # 카페
+    cb5, cb6 = st.columns([5, 1])
+    with cb5:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
             </div>
             <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">카페</span>
         </div>""", unsafe_allow_html=True)
-    with c3_2:
+    with cb6:
         search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
 
-with col4:
-    c4_1, c4_2 = st.columns([3, 1])
-    with c4_1:
+    # 유튜브
+    cb7, cb8 = st.columns([5, 1])
+    with cb7:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF">
-                    <polygon points="5,3 19,12 5,21"/>
-                </svg>
+            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
             </div>
             <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">유튜브</span>
         </div>""", unsafe_allow_html=True)
-    with c4_2:
+    with cb8:
         search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
 
     # ── ② 검색어 ────────────────────────────────────────────
