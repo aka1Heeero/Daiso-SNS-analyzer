@@ -743,7 +743,7 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">DAISO</div>
+        ">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
@@ -785,7 +785,7 @@ with st.sidebar:
 
     # ── 2번 수정: [아이콘][라벨][체크박스] 인라인 배치 ──
     # 블로그
-    cb1, cb2 = st.columns([5, 1])
+    cb1, cb2 = st.columns([3, 1])
     with cb1:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
@@ -798,7 +798,7 @@ with st.sidebar:
         search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
 
     # 지식인
-    cb3, cb4 = st.columns([5, 1])
+    cb3, cb4 = st.columns([3, 1])
     with cb3:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
@@ -811,7 +811,7 @@ with st.sidebar:
         search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
 
     # 카페
-    cb5, cb6 = st.columns([5, 1])
+    cb5, cb6 = st.columns([3, 1])
     with cb5:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
@@ -824,7 +824,7 @@ with st.sidebar:
         search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
 
     # 유튜브
-    cb7, cb8 = st.columns([5, 1])
+    cb7, cb8 = st.columns([3, 1])
     with cb7:
         st.markdown("""
         <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
