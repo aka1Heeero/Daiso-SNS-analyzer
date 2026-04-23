@@ -1010,7 +1010,7 @@ with st.sidebar:
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
         </div>
-        <span class="sb-section-text">분석 검색어</span>
+        <span class="sb-section-text">Searching Word</span>
     </div>
     """, unsafe_allow_html=True)
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
