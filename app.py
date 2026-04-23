@@ -783,58 +783,64 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 2번 수정: [아이콘][라벨][체크박스] 인라인 배치 ──
-    # 블로그
-    cb1, cb2 = st.columns([5, 1])
-    with cb1:
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
-            </div>
-            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">블로그</span>
-        </div>""", unsafe_allow_html=True)
-    with cb2:
-        search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
+    # ── 채널 선택: 2열 그리드 [아이콘+라벨+체크박스] ──
+    col_left, col_right = st.columns(2)
 
-    # 지식인
-    cb3, cb4 = st.columns([5, 1])
-    with cb3:
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
-            </div>
-            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">지식인</span>
-        </div>""", unsafe_allow_html=True)
-    with cb4:
-        search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
+    # 블로그 (좌상)
+    with col_left:
+        row1_l, row1_cb = st.columns([4, 1])
+        with row1_l:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
+                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">블로그</span>
+            </div>""", unsafe_allow_html=True)
+        with row1_cb:
+            search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
 
-    # 카페
-    cb5, cb6 = st.columns([5, 1])
-    with cb5:
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
-            </div>
-            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">카페</span>
-        </div>""", unsafe_allow_html=True)
-    with cb6:
-        search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+    # 지식인 (우상)
+    with col_right:
+        row1_r, row1_rcb = st.columns([4, 1])
+        with row1_r:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
+                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">지식인</span>
+            </div>""", unsafe_allow_html=True)
+        with row1_rcb:
+            search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
 
-    # 유튜브
-    cb7, cb8 = st.columns([5, 1])
-    with cb7:
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:0.4rem;height:32px;">
-            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
-            </div>
-            <span style="font-size:0.82rem;font-weight:500;color:#1A202C;">유튜브</span>
-        </div>""", unsafe_allow_html=True)
-    with cb8:
-        search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
+    # 카페 (좌하)
+    with col_left:
+        row2_l, row2_cb = st.columns([4, 1])
+        with row2_l:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
+                <div style="width:20px;height:20px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="color:#FFFFFF;font-size:0.58rem;font-weight:900;">N</span>
+                </div>
+                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">카페</span>
+            </div>""", unsafe_allow_html=True)
+        with row2_cb:
+            search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+
+    # 유튜브 (우하)
+    with col_right:
+        row2_r, row2_rcb = st.columns([4, 1])
+        with row2_r:
+            st.markdown("""
+            <div style="display:flex;align-items:center;gap:0.35rem;height:30px;">
+                <div style="width:20px;height:20px;background:#FF0000;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
+                </div>
+                <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">유튜브</span>
+            </div>""", unsafe_allow_html=True)
+        with row2_rcb:
+            search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
 
     # ── ② 검색어 ────────────────────────────────────────────
     st.markdown("""
