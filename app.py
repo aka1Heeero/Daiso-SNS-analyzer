@@ -15,7 +15,7 @@ from collections import Counter
 # 페이지 설정
 # ============================
 st.set_page_config(
-    page_title="DAISO SNS-LENS",
+    page_title="DAISO SNS-Issue Finder",
     page_icon="🔵",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -387,7 +387,7 @@ def check_password():
     st.markdown("""
     <div class="login-wrap">
         <div class="login-icon">🔵</div>
-        <div class="login-title">DAISO SNS-LENS</div>
+        <div class="login-title">DAISO SNS Issue Finder</div>
         <div class="login-sub">SNS 불만/감성 AI분석 시스템</div>
     </div>
     """, unsafe_allow_html=True)
@@ -676,7 +676,7 @@ def match_product_name(code):
 # 엑셀 생성
 # ============================
 def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
-    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS LENS"
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS-ISSUE-FINDER"
     headers = ["출처","검색어","소분류","품번","품명","가격언급","제목","링크","날짜","감성","확신도(%)","채널/카페명","조회수","좋아요","댓글수"]
     ws.append(headers)
     hf   = openpyxl.styles.Font(bold=True, color="0066CC", name="Malgun Gothic")
@@ -747,8 +747,8 @@ st.markdown("""
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS-LENS · 불만 감성분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 다이소 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
+        <div class="header-title">SNS-ISSUE FINDER & AI감성분석</div>
+        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -765,7 +765,7 @@ with st.sidebar:
             <span style="color:#FFFFFF;font-size:0.65rem;font-weight:900;letter-spacing:0.05em;font-family:'Inter',sans-serif;">D</span>
         </div>
         <div>
-            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO SNS-LENS</div>
+            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO SNS Issue Finder</div>
             <div style="font-size:0.68rem;color:#718096;">Created by 데이터분석팀</div>
         </div>
     </div>
@@ -860,26 +860,46 @@ with st.sidebar:
 
     # ── ③ 수집 기간 (간격 축소) ─────────────────────────────
     st.markdown("""
-    <div class="sb-section">
-        <div class="sb-section-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-        </div>
-        <span class="sb-section-text">수집 기간</span>
+<div class="sb-section">
+    <div class="sb-section-icon">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
     </div>
-    """, unsafe_allow_html=True)
+    <span class="sb-section-text">수집 기간</span>
+</div>
+""", unsafe_allow_html=True)
 
-    dc1, dc2 = st.columns(2)
-    with dc1:
+dc1, dc2 = st.columns(2)
+
+# 시작일
+with dc1:
+    c1, c2 = st.columns([1, 3])
+    with c1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
-        start_date = st.date_input("시작일", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
-    with dc2:
-        st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
-        end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
+    with c2:
+        start_date = st.date_input(
+            "", 
+            value=date(2025, 1, 1),
+            label_visibility="collapsed",
+            key="date_start"
+        )
 
+# 종료일
+with dc2:
+    c3, c4 = st.columns([1, 3])
+    with c3:
+        st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
+    with c4:
+        end_date = st.date_input(
+            "", 
+            value=date.today(),
+            label_visibility="collapsed",
+            key="date_end"
+        )
     # ── ④ 수집 개수 (최대 5,000건으로 변경) ─────────────────
     st.markdown("""
     <div class="sb-section">
