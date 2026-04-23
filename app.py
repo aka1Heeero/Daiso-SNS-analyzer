@@ -1070,7 +1070,7 @@ with st.sidebar:
                 <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
         </div>
-        <span class="sb-section-text">신뢰도 조정</span>
+        <span class="sb-section-text">감성 파라미터</span>
     </div>
     """, unsafe_allow_html=True)
     threshold = st.number_input(
@@ -1080,11 +1080,11 @@ with st.sidebar:
     )
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
-    # ── [FIX 3] 감성 파라미터 안내 ────────────────────────────
+    # ── [FIX 3] 감성 파라미터 기준 ────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
-        <span class="sb-section-text">감성 파라미터 가이드</span>
+        <span class="sb-section-text">PARAMETER GUIDE</span>
     </div>
     <div class="param-guide-box">
         <b>📌 AI 모델 가중치 변경</b><br>
