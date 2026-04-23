@@ -3,11 +3,10 @@ import requests
 import openpyxl
 import re
 import io
-import time
 import gspread
 import pandas as pd
 import altair as alt
-from datetime import datetime
+from datetime import datetime, date
 from google.oauth2.service_account import Credentials
 from transformers import pipeline
 from collections import Counter
@@ -23,7 +22,7 @@ st.set_page_config(
 )
 
 # ============================
-# CSS — 클린 화이트 + 블루 포인트
+# CSS
 # ============================
 st.markdown("""
 <style>
@@ -56,14 +55,15 @@ html, body, .stApp {
     font-family: 'Noto Sans KR', sans-serif !important;
 }
 
-/* 사이드바 */
+/* ── 사이드바 ── */
 [data-testid="stSidebar"] {
     background: var(--bg-white) !important;
     border-right: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] * { color: var(--text) !important; }
 [data-testid="stSidebar"] .stTextInput input,
-[data-testid="stSidebar"] .stTextArea textarea {
+[data-testid="stSidebar"] .stTextArea textarea,
+[data-testid="stSidebar"] .stNumberInput input {
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
@@ -72,12 +72,26 @@ html, body, .stApp {
     font-size: 0.875rem !important;
 }
 [data-testid="stSidebar"] .stTextInput input:focus,
-[data-testid="stSidebar"] .stTextArea textarea:focus {
+[data-testid="stSidebar"] .stTextArea textarea:focus,
+[data-testid="stSidebar"] .stNumberInput input:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
+    outline: none !important;
+}
+/* 달력 날짜 선택 input */
+[data-testid="stSidebar"] [data-testid="stDateInput"] input {
+    background: var(--bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 0.875rem !important;
+}
+[data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
 }
 
-/* 헤더 */
+/* ── 헤더 ── */
 .app-header {
     background: var(--bg-white);
     border-bottom: 1px solid var(--border);
@@ -94,7 +108,7 @@ html, body, .stApp {
     background: var(--primary);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; color: white; flex-shrink: 0;
+    font-size: 1.1rem; color: #FFFFFF !important; flex-shrink: 0;
 }
 .header-title {
     font-size: 1.25rem; font-weight: 700;
@@ -105,7 +119,7 @@ html, body, .stApp {
     margin-top: 0.1rem;
 }
 
-/* 카드 */
+/* ── 카드 ── */
 .card {
     background: var(--bg-white);
     border: 1px solid var(--border);
@@ -114,22 +128,8 @@ html, body, .stApp {
     box-shadow: var(--shadow);
     margin-bottom: 1rem;
 }
-.card-title {
-    font-size: 0.72rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--text3); margin-bottom: 0.75rem;
-    display: flex; align-items: center; gap: 0.4rem;
-}
-.card-title-icon {
-    width: 20px; height: 20px;
-    background: var(--primary);
-    border-radius: 5px;
-    display: inline-flex; align-items: center; justify-content: center;
-    color: white; font-size: 0.65rem;
-}
 
-/* 메트릭 카드 */
-.metric-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+/* ── 메트릭 카드 ── */
 .metric-card {
     flex: 1; background: var(--bg-white);
     border: 1px solid var(--border); border-radius: 12px;
@@ -143,42 +143,44 @@ html, body, .stApp {
 .metric-label {
     font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.5rem;
-    display: flex; align-items: center; gap: 0.4rem;
+    display: flex; align-items: center; gap: 0.5rem;
 }
+/* 7번 수정: 파란 아이콘 안 텍스트 흰색 강제 */
 .metric-icon {
-    width: 22px; height: 22px; background: var(--primary);
-    border-radius: 6px; display: inline-flex;
-    align-items: center; justify-content: center;
-    color: white; font-size: 0.7rem;
+    width: 22px; height: 22px;
+    background: var(--primary);
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #FFFFFF !important;
+    font-size: 0.68rem; font-weight: 700;
+    flex-shrink: 0; line-height: 1;
 }
-.metric-icon.pos { background: var(--pos); }
-.metric-icon.neg { background: var(--neg); }
-.metric-icon.neu { background: var(--neu); }
+.metric-icon.pos { background: var(--pos);  color: #FFFFFF !important; }
+.metric-icon.neg { background: var(--neg);  color: #FFFFFF !important; }
+.metric-icon.neu { background: var(--neu);  color: #FFFFFF !important; }
 .metric-value {
     font-family: 'Inter', sans-serif; font-size: 2.2rem;
     font-weight: 600; color: var(--text); line-height: 1;
 }
 .metric-pct { font-size: 0.78rem; color: var(--text3); margin-top: 0.3rem; }
 
-/* 섹션 타이틀 */
-.section-title {
-    font-size: 0.95rem; font-weight: 600; color: var(--text);
-    margin: 1.5rem 0 0.75rem;
-    display: flex; align-items: center; gap: 0.5rem;
-}
+/* ── 섹션 타이틀 아이콘 — 7번 수정 ── */
 .section-title-icon {
-    width: 24px; height: 24px; background: var(--primary);
-    border-radius: 6px; display: inline-flex;
-    align-items: center; justify-content: center;
-    color: white; font-size: 0.75rem; flex-shrink: 0;
+    width: 24px; height: 24px;
+    background: var(--primary);
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #FFFFFF !important;
+    font-size: 0.75rem; font-weight: 700;
+    flex-shrink: 0; vertical-align: middle;
 }
 
-/* 감성 뱃지 */
+/* ── 감성 뱃지 ── */
 .badge-pos { background: var(--pos-bg); color: var(--pos); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neg { background: var(--neg-bg); color: var(--neg); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neu { background: var(--neu-bg); color: var(--neu); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 
-/* TOP 아이템 */
+/* ── TOP 아이템 ── */
 .top-item {
     display: flex; align-items: center; gap: 0.75rem;
     padding: 0.6rem 0; border-bottom: 1px solid var(--border);
@@ -190,14 +192,14 @@ html, body, .stApp {
     justify-content: center; font-size: 0.72rem; font-weight: 700;
     color: var(--primary); flex-shrink: 0;
 }
-.top-rank.r1 { background: var(--primary); color: white; }
+.top-rank.r1 { background: var(--primary); color: #FFFFFF !important; }
 .top-name { flex: 1; font-size: 0.85rem; color: var(--text); }
 .top-count {
     font-size: 0.78rem; font-weight: 600; color: var(--primary);
     background: var(--primary-lt); padding: 2px 8px; border-radius: 20px;
 }
 
-/* 결과 행 카드 */
+/* ── 결과 카드 ── */
 .result-card {
     background: var(--bg-white); border: 1px solid var(--border);
     border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.5rem;
@@ -208,7 +210,7 @@ html, body, .stApp {
 .result-meta { font-size: 0.75rem; color: var(--text3); display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .result-meta span { display: flex; align-items: center; gap: 0.2rem; }
 
-/* 로그인 */
+/* ── 로그인 ── */
 .login-wrap {
     max-width: 380px; margin: 5rem auto;
     background: var(--bg-white); border: 1px solid var(--border);
@@ -219,37 +221,70 @@ html, body, .stApp {
     width: 52px; height: 52px; background: var(--primary);
     border-radius: 14px; margin: 0 auto 1rem;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem; color: white;
+    font-size: 1.4rem; color: #FFFFFF !important;
 }
-.login-title {
-    font-size: 1.3rem; font-weight: 700; color: var(--text);
-    margin-bottom: 0.25rem;
-}
+.login-title { font-size: 1.3rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
 .login-sub { font-size: 0.82rem; color: var(--text3); margin-bottom: 1.5rem; }
 
-/* 사이드바 라벨 */
-.sb-label {
-    font-size: 0.72rem; font-weight: 600; color: var(--text2);
-    text-transform: uppercase; letter-spacing: 0.06em;
-    margin: 1rem 0 0.3rem; display: block;
+/* ── 사이드바 섹션 헤더 — 1번 수정(이모지 제거, 텍스트만) ── */
+.sb-section {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    background: var(--primary-lt);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 6px 6px 0;
+    margin: 1rem 0 0.5rem;
 }
-.sb-hint { font-size: 0.7rem; color: var(--text3); margin-top: 0.2rem; display: block; }
+.sb-section-icon {
+    width: 20px; height: 20px;
+    background: var(--primary);
+    border-radius: 5px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #FFFFFF !important;
+    font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
+}
+.sb-section-text {
+    font-size: 0.72rem; font-weight: 700;
+    color: var(--primary) !important;
+    text-transform: uppercase; letter-spacing: 0.07em;
+}
+.sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; display: block; line-height: 1.5; }
 
-/* 진행바 */
-.stProgress > div > div > div > div {
-    background: var(--primary) !important; border-radius: 4px !important;
+/* ── 채널 체크박스 행 ── */
+.channel-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.45rem 0.6rem; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg);
+    margin-bottom: 0.4rem; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
 }
-.stProgress > div > div > div {
-    background: var(--border) !important; border-radius: 4px !important; height: 6px !important;
+.channel-row:hover { border-color: var(--primary-md); background: var(--primary-lt); }
+.ch-icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: #FFFFFF !important;
+    font-weight: 700; flex-shrink: 0;
+}
+.ch-naver  { background: #03C75A; }  /* 네이버 그린 */
+.ch-youtube { background: #FF0000; } /* 유튜브 레드 */
+.ch-label { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+
+/* ── 숫자 입력 ── */
+[data-testid="stNumberInput"] > div {
+    border-radius: 8px !important;
+}
+[data-testid="stNumberInput"] button {
+    color: var(--primary) !important;
 }
 
-/* 버튼 */
+/* ── 버튼 ── */
 .stButton > button {
-    background: var(--primary) !important; color: white !important;
+    background: var(--primary) !important; color: #FFFFFF !important;
     border: none !important; border-radius: 8px !important;
     font-family: 'Noto Sans KR', sans-serif !important;
-    font-size: 0.875rem !important; font-weight: 500 !important;
-    padding: 0.55rem 1.25rem !important; transition: all 0.2s !important;
+    font-size: 0.875rem !important; font-weight: 600 !important;
+    padding: 0.6rem 1.25rem !important; transition: all 0.2s !important;
+    letter-spacing: 0.01em !important;
 }
 .stButton > button:hover {
     background: #0052A3 !important;
@@ -262,15 +297,12 @@ html, body, .stApp {
     font-size: 0.875rem !important; font-weight: 500 !important;
     width: 100% !important;
 }
-.stDownloadButton > button:hover {
-    background: var(--primary-lt) !important;
-}
+.stDownloadButton > button:hover { background: var(--primary-lt) !important; }
 
-/* 탭 */
+/* ── 탭 ── */
 .stTabs [data-baseweb="tab-list"] {
     background: transparent !important;
-    border-bottom: 2px solid var(--border) !important;
-    gap: 0 !important;
+    border-bottom: 2px solid var(--border) !important; gap: 0 !important;
 }
 .stTabs [data-baseweb="tab"] {
     font-family: 'Noto Sans KR', sans-serif !important;
@@ -286,22 +318,22 @@ html, body, .stApp {
 }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 1.25rem !important; }
 
-/* 구분선 */
-hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 0 !important; }
-
-/* 체크박스 */
-.stCheckbox > label { font-size: 0.875rem !important; }
-
-/* 데이터프레임 */
+/* ── 기타 ── */
+.stProgress > div > div > div > div { background: var(--primary) !important; border-radius: 4px !important; }
+.stProgress > div > div > div { background: var(--border) !important; border-radius: 4px !important; height: 6px !important; }
 .stDataFrame { border-radius: 10px !important; overflow: hidden !important; }
-
-/* 슬라이더 */
-.stSlider > div > div > div > div { background: var(--primary) !important; }
-
-/* 알림 */
 .stAlert { border-radius: 8px !important; }
-
+hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 0 !important; }
 #MainMenu, footer, header { visibility: hidden; }
+
+/* 추가예정 뱃지 */
+.badge-coming {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: #F1F5F9; color: #64748B;
+    border: 1px dashed #CBD5E1;
+    padding: 0.35rem 0.75rem; border-radius: 6px;
+    font-size: 0.78rem; font-weight: 500;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -343,34 +375,26 @@ YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
 
 
 # ============================
-# Google Sheets — 품명 DB 로드
+# Google Sheets — 품명 DB
 # ============================
 @st.cache_data(ttl=3600)
 def load_product_db():
-    """
-    Google Sheets에서 품번/품명/소분류 DataFrame을 로드.
-    secrets.toml에 [gcp_service_account] 및 GSHEET_URL 필요.
-    """
     try:
         creds = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
         )
-        gc   = gspread.authorize(creds)
-        sh   = gc.open_by_url(st.secrets["GSHEET_URL"])
-        df   = pd.DataFrame(sh.sheet1.get_all_records())
-        # 컬럼명 정규화
+        gc  = gspread.authorize(creds)
+        sh  = gc.open_by_url(st.secrets["GSHEET_URL"])
+        df  = pd.DataFrame(sh.sheet1.get_all_records())
         df.columns = [c.strip() for c in df.columns]
-        return df   # 품번 | 품명 | 소분류
+        return df
     except Exception as e:
-        st.warning(f"⚠ 품명 DB 로드 실패 (Google Sheets 미연결): {e}")
+        st.warning(f"⚠ 품명 DB 로드 실패: {e}")
         return pd.DataFrame(columns=["품번", "품명", "소분류"])
 
 PRODUCT_DB = load_product_db()
 
-# ============================
-# 소분류 목록 — Google Sheets에서 자동 추출
-# ============================
 def load_subcategories():
     if not PRODUCT_DB.empty and "소분류" in PRODUCT_DB.columns:
         return list(PRODUCT_DB["소분류"].dropna().unique())
@@ -380,35 +404,27 @@ SUBCATEGORIES = load_subcategories()
 
 
 # ============================
-# AI 앙상블 모델 (3종)
+# AI 앙상블 모델
 # ============================
 @st.cache_resource
 def load_electra():
-    """1순위: KR-ELECTRA — 한국어 소비자 리뷰 최적화"""
     try:
-        return pipeline(
-            "text-classification",
-            model="snunlp/KR-ELECTRA-discriminator",
-            truncation=True, max_length=512, top_k=None, device=-1
-        )
+        return pipeline("text-classification", model="snunlp/KR-ELECTRA-discriminator",
+                        truncation=True, max_length=512, top_k=None, device=-1)
     except Exception:
         return None
 
 @st.cache_resource
 def load_roberta():
-    """2순위: KLUE-RoBERTa — 한국어 감성 fine-tuned"""
     try:
-        return pipeline(
-            "text-classification",
-            model="Chamsol/klue-roberta-sentiment-classification",
-            truncation=True, max_length=512, top_k=None, device=-1
-        )
+        return pipeline("text-classification", model="Chamsol/klue-roberta-sentiment-classification",
+                        truncation=True, max_length=512, top_k=None, device=-1)
     except Exception:
         return None
 
 
 # ============================
-# 키워드 룰베이스
+# 룰베이스 & 앙상블
 # ============================
 NEGATIVE_KW = [
     "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
@@ -422,74 +438,46 @@ POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
     "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱"
 ]
-
 LABEL_MAP = {
-    # KR-ELECTRA 레이블
     "positive":"호평","pos":"호평","LABEL_2":"호평","호평":"호평",
     "negative":"악평","neg":"악평","LABEL_0":"악평","악평":"악평",
     "neutral":"중립","neu":"중립","LABEL_1":"중립","중립":"중립",
-    # KLUE-RoBERTa 레이블 (0=부정,1=중립,2=긍정 또는 문자열)
     "부정":"악평","긍정":"호평",
 }
 
 def rule_based(text: str):
     neg = sum(1 for kw in NEGATIVE_KW if kw in text)
     pos = sum(1 for kw in POSITIVE_KW if kw in text)
-    if neg > pos:   return "악평", min(0.6 + neg * 0.07, 0.97)
-    if pos > neg:   return "호평", min(0.55 + pos * 0.07, 0.97)
+    if neg > pos:  return "악평", min(0.6 + neg * 0.07, 0.97)
+    if pos > neg:  return "호평", min(0.55 + pos * 0.07, 0.97)
     return "중립", 0.50
 
 def ai_ensemble(text: str, model_e, model_r) -> tuple:
-    """
-    앙상블 가중치:
-      KR-ELECTRA  × 1.6  (메인)
-      KLUE-RoBERTa × 1.0  (보조)
-      룰베이스     × 0.6  (보정)
-
-    악평 확정 조건:
-      ELECTRA 부정 60% 이상 AND 네거티브 키워드 2개 이상
-      → 과검출 방지 (요구사항 4번)
-    """
     votes = {"호평": 0.0, "악평": 0.0, "중립": 0.0}
     electra_neg_score = 0.0
-
     if model_e:
         try:
             for it in model_e(text[:512])[0]:
                 lbl = LABEL_MAP.get(it["label"])
                 if lbl:
                     votes[lbl] += it["score"] * 1.6
-                    if lbl == "악평":
-                        electra_neg_score = it["score"]
-        except Exception:
-            pass
-
+                    if lbl == "악평": electra_neg_score = it["score"]
+        except Exception: pass
     if model_r:
         try:
             for it in model_r(text[:512])[0]:
                 lbl = LABEL_MAP.get(it["label"])
-                if lbl:
-                    votes[lbl] += it["score"] * 1.0
-        except Exception:
-            pass
-
+                if lbl: votes[lbl] += it["score"] * 1.0
+        except Exception: pass
     rule_lbl, rule_sc = rule_based(text)
     votes[rule_lbl] += rule_sc * 0.6
-
     total = sum(votes.values())
-    if total == 0:
-        return "중립", 50.0
-
+    if total == 0: return "중립", 50.0
     best  = max(votes, key=votes.get)
     score = round(votes[best] / total * 100, 1)
-
-    # ── 과검출 방지 로직 ──────────────────────────────────
     neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in text)
-    # 악평으로 판정되려면: ELECTRA 부정 ≥60% AND 네거티브 키워드 ≥2개
     if best == "악평" and not (electra_neg_score >= 0.60 and neg_kw_cnt >= 2):
-        best  = "중립"
-        score = max(score * 0.7, 45.0)
-
+        best = "중립"; score = max(score * 0.7, 45.0)
     return best, score
 
 
@@ -499,34 +487,28 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
 def search_naver(query: str, search_type: str = "blog", display: int = 100) -> list:
     url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params  = {"query": query, "display": display, "sort": "date"}
+    params  = {"query": query, "display": min(display, 100), "sort": "date"}
     try:
-        resp  = requests.get(url, headers=headers, params=params, timeout=10)
-        items = resp.json().get("items", [])
+        items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
     except Exception:
         items = []
     label = "블로그" if search_type == "blog" else "지식인"
-    for item in items:
-        item["출처"] = label
-        item["검색어"] = query
+    for item in items: item["출처"] = label; item["검색어"] = query
     return items
 
 def search_naver_cafe(query: str, display: int = 100) -> list:
     url     = "https://openapi.naver.com/v1/search/cafearticle.json"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params  = {"query": query, "display": display, "sort": "date"}
+    params  = {"query": query, "display": min(display, 100), "sort": "date"}
     try:
-        resp  = requests.get(url, headers=headers, params=params, timeout=10)
-        items = resp.json().get("items", [])
+        items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
     except Exception:
         items = []
     result = []
     for item in items:
-        cafe_name = item.get("cafename", "")
-        if "다이소" in cafe_name or "DAISO" in cafe_name.upper():
-            item["출처"]   = "카페"
-            item["검색어"] = query
-            item["channel"] = cafe_name
+        cn = item.get("cafename", "")
+        if "다이소" in cn or "DAISO" in cn.upper():
+            item["출처"] = "카페"; item["검색어"] = query; item["channel"] = cn
             result.append(item)
     return result
 
@@ -535,78 +517,47 @@ def search_naver_cafe(query: str, display: int = 100) -> list:
 # YouTube
 # ============================
 def search_youtube(query: str, max_results: int = 30) -> list:
-    if not YOUTUBE_API_KEY:
-        return []
+    if not YOUTUBE_API_KEY: return []
     try:
         resp = requests.get("https://www.googleapis.com/youtube/v3/search", params={
             "key": YOUTUBE_API_KEY, "q": query, "part": "snippet",
             "type": "video", "maxResults": min(max_results, 50),
             "order": "date", "relevanceLanguage": "ko", "regionCode": "KR"
         }, timeout=10)
-        data  = resp.json()
-    except Exception:
-        return []
-    if "error" in data:
-        return []
+        data = resp.json()
+    except Exception: return []
+    if "error" in data: return []
     items     = data.get("items", [])
     video_ids = [i["id"]["videoId"] for i in items if i.get("id", {}).get("videoId")]
     stats_map = {}
     if video_ids:
         try:
-            sr = requests.get("https://www.googleapis.com/youtube/v3/videos", params={
+            for sv in requests.get("https://www.googleapis.com/youtube/v3/videos", params={
                 "key": YOUTUBE_API_KEY, "id": ",".join(video_ids), "part": "statistics"
-            }, timeout=10)
-            for sv in sr.json().get("items", []):
+            }, timeout=10).json().get("items", []):
                 stats_map[sv["id"]] = sv.get("statistics", {})
-        except Exception:
-            pass
+        except Exception: pass
     results = []
     for item in items:
         vid_id  = item.get("id", {}).get("videoId", "")
         snippet = item.get("snippet", {})
         stats   = stats_map.get(vid_id, {})
         pub_raw = snippet.get("publishedAt", "")
-        try:
-            pub_dt  = datetime.strptime(pub_raw[:10], "%Y-%m-%d")
-            pub_str = pub_dt.strftime("%Y-%m-%d")
-        except Exception:
-            pub_dt = None; pub_str = pub_raw[:10]
+        try:   pub_dt = datetime.strptime(pub_raw[:10], "%Y-%m-%d"); pub_str = pub_dt.strftime("%Y-%m-%d")
+        except: pub_dt = None; pub_str = pub_raw[:10]
         results.append({
-            "출처": "유튜브", "검색어": query, "video_id": vid_id,
-            "title": snippet.get("title", ""),
-            "description": snippet.get("description", "")[:300],
-            "channel": snippet.get("channelTitle", ""),
-            "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
-            "link": f"https://www.youtube.com/watch?v={vid_id}",
-            "날짜": pub_str, "pub_dt": pub_dt,
-            "views":    int(stats.get("viewCount",    0) or 0),
-            "likes":    int(stats.get("likeCount",    0) or 0),
-            "comments": int(stats.get("commentCount", 0) or 0),
+            "출처":"유튜브","검색어":query,"video_id":vid_id,
+            "title":snippet.get("title",""),
+            "description":snippet.get("description","")[:300],
+            "channel":snippet.get("channelTitle",""),
+            "thumbnail":snippet.get("thumbnails",{}).get("medium",{}).get("url",""),
+            "link":f"https://www.youtube.com/watch?v={vid_id}",
+            "날짜":pub_str,"pub_dt":pub_dt,
+            "views":int(stats.get("viewCount",0) or 0),
+            "likes":int(stats.get("likeCount",0) or 0),
+            "comments":int(stats.get("commentCount",0) or 0),
         })
     return results
-
-def fetch_youtube_comments(video_id: str, max_results: int = 30) -> list:
-    if not YOUTUBE_API_KEY:
-        return []
-    try:
-        resp = requests.get("https://www.googleapis.com/youtube/v3/commentThreads", params={
-            "key": YOUTUBE_API_KEY, "videoId": video_id, "part": "snippet",
-            "maxResults": max_results, "order": "relevance", "textFormat": "plainText"
-        }, timeout=10)
-        data = resp.json()
-    except Exception:
-        return []
-    if "error" in data:
-        return []
-    comments = []
-    for item in data.get("items", []):
-        top = item["snippet"]["topLevelComment"]["snippet"]
-        comments.append({
-            "text":      top.get("textDisplay", ""),
-            "likes":     top.get("likeCount", 0),
-            "published": top.get("publishedAt", "")[:10]
-        })
-    return comments
 
 
 # ============================
@@ -615,20 +566,17 @@ def fetch_youtube_comments(video_id: str, max_results: int = 30) -> list:
 def parse_date(item: dict):
     ds = item.get("postdate") or item.get("pubDate", "")
     try:
-        if len(ds) == 8:
-            return datetime.strptime(ds, "%Y%m%d")
+        if len(ds) == 8: return datetime.strptime(ds, "%Y%m%d")
         return datetime.strptime(ds[:16], "%a, %d %b %Y")
-    except Exception:
-        return None
+    except: return None
 
-def filter_by_date(items: list, start: str, end: str) -> list:
-    s = datetime.strptime(start, "%Y%m%d")
-    e = datetime.strptime(end,   "%Y%m%d")
+def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
+    s = datetime(start_dt.year, start_dt.month, start_dt.day)
+    e = datetime(end_dt.year,   end_dt.month,   end_dt.day, 23, 59, 59)
     result = []
     for item in items:
         dt = item.get("pub_dt") if item.get("출처") == "유튜브" else parse_date(item)
-        if dt and s <= dt <= e:
-            result.append(item)
+        if dt and s <= dt <= e: result.append(item)
     return result
 
 def clean_text(text: str) -> str:
@@ -638,122 +586,78 @@ def clean_text(text: str) -> str:
 
 
 # ============================
-# 품번 추출 (날짜형 제외)
+# 품번·소분류 추출
 # ============================
 DATE_PATS = [
     r'\b20\d{6}\b', r'\b\d{4}[-./]\d{2}[-./]\d{2}\b',
     r'\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b',
     r'\b\d{4}년\s*\d{1,2}월', r'\b\d{1,2}월\s*\d{1,2}일',
 ]
-def is_date_like(token: str) -> bool:
+def is_date_like(t):
     for p in DATE_PATS:
-        if re.fullmatch(p, token.strip()):
-            return True
-    return bool(re.fullmatch(r'\d{6,8}', token.strip()))
+        if re.fullmatch(p, t.strip()): return True
+    return bool(re.fullmatch(r'\d{6,8}', t.strip()))
 
-def extract_product_code(text: str) -> str:
+def extract_product_code(text):
     raw   = re.findall(r'\b(?:[A-Za-z]{1,4}[-_]?\d{3,7}|\d{3,6}[-_][A-Za-z]{1,4}|NO\.?\s?\d{2,6})\b', text)
     codes = [c for c in raw if not is_date_like(c)]
     return ", ".join(dict.fromkeys(codes)) if codes else ""
 
-def extract_price(text: str) -> str:
+def extract_price(text):
     prices = re.findall(r'\d{1,3}(?:,\d{3})*원', text)
     return ", ".join(dict.fromkeys(prices)) if prices else ""
 
-
-# ============================
-# 소분류 매칭 — Lv.2.5 (1→2→3차 단계별)
-# ============================
-# 동의어 사전 (필요시 확장)
 SYNONYM_MAP = {
-    "꽂이":    "홀더", "홀더":    "꽂이",
-    "수납":    "정리", "정리":    "수납",
-    "바구니":  "수납함", "수납함": "바구니",
-    "케이스":  "커버", "커버":    "케이스",
-    "그릇":    "용기", "용기":    "그릇",
-    "팬":      "후라이팬", "후라이팬": "팬",
-    "집게":    "클립", "클립":    "집게",
-    "수건":    "타월", "타월":    "수건",
+    "꽂이":"홀더","홀더":"꽂이","수납":"정리","정리":"수납",
+    "바구니":"수납함","수납함":"바구니","케이스":"커버","커버":"케이스",
+    "그릇":"용기","용기":"그릇","팬":"후라이팬","후라이팬":"팬",
+    "집게":"클립","클립":"집게","수건":"타월","타월":"수건",
 }
 
-def extract_subcategory(text: str) -> str:
-    if not SUBCATEGORIES:
-        return ""
-    text_lower = text
-
-    # 1차: 완전 매칭
-    found = [s for s in SUBCATEGORIES if s in text_lower]
-    if found:
-        return ", ".join(dict.fromkeys(found))
-
-    # 2차: 동의어 사전 치환 후 재매칭
-    text_syn = text_lower
-    for word, syn in SYNONYM_MAP.items():
-        text_syn = text_syn.replace(word, syn)
+def extract_subcategory(text):
+    if not SUBCATEGORIES: return ""
+    found = [s for s in SUBCATEGORIES if s in text]
+    if found: return ", ".join(dict.fromkeys(found))
+    text_syn = text
+    for w, s in SYNONYM_MAP.items(): text_syn = text_syn.replace(w, s)
     found2 = [s for s in SUBCATEGORIES if s in text_syn]
-    if found2:
-        return ", ".join(dict.fromkeys(found2))
-
-    # 3차: 핵심 키워드(2글자 이상 형태소) 부분 매칭
-    tokens = re.findall(r'[가-힣]{2,}', text_lower)
-    found3 = []
-    for s in SUBCATEGORIES:
-        s_tokens = re.findall(r'[가-힣]{2,}', s)
-        if any(t in tokens for t in s_tokens if len(t) >= 2):
-            found3.append(s)
+    if found2: return ", ".join(dict.fromkeys(found2))
+    tokens = re.findall(r'[가-힣]{2,}', text)
+    found3 = [s for s in SUBCATEGORIES if any(t in tokens for t in re.findall(r'[가-힣]{2,}', s) if len(t) >= 2)]
     if found3:
-        # 가장 많이 겹치는 소분류 1개만 반환
-        def overlap(s):
-            s_t = re.findall(r'[가-힣]{2,}', s)
-            return sum(1 for t in s_t if t in tokens)
-        found3.sort(key=overlap, reverse=True)
+        found3.sort(key=lambda s: sum(1 for t in re.findall(r'[가-힣]{2,}', s) if t in tokens), reverse=True)
         return found3[0]
-
     return ""
 
-def match_product_name(code: str) -> str:
-    """품번으로 품명 조회"""
-    if PRODUCT_DB.empty or not code:
-        return ""
+def match_product_name(code):
+    if PRODUCT_DB.empty or not code: return ""
     for c in [c.strip() for c in code.split(",")]:
         row = PRODUCT_DB[PRODUCT_DB["품번"].astype(str) == c]
-        if not row.empty:
-            return row.iloc[0]["품명"]
+        if not row.empty: return row.iloc[0]["품명"]
     return ""
 
 
 # ============================
 # 엑셀 생성
 # ============================
-def create_excel(data: list, start_date: str, end_date: str) -> io.BytesIO:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "LENS 분석결과"
+def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS LENS"
     headers = ["출처","검색어","소분류","품번","품명","가격언급","제목","링크","날짜","감성","확신도(%)","채널/카페명","조회수","좋아요","댓글수"]
     ws.append(headers)
     hf   = openpyxl.styles.Font(bold=True, color="0066CC", name="Malgun Gothic")
     hfil = openpyxl.styles.PatternFill(start_color="E8F1FB", end_color="E8F1FB", fill_type="solid")
     hbrd = openpyxl.styles.Border(bottom=openpyxl.styles.Side(style="thin", color="0066CC"))
     for c in range(1, len(headers)+1):
-        cell = ws.cell(1, c)
-        cell.font = hf; cell.fill = hfil; cell.border = hbrd
+        cell = ws.cell(1, c); cell.font = hf; cell.fill = hfil; cell.border = hbrd
         cell.alignment = openpyxl.styles.Alignment(horizontal="center")
     col_bg  = {"호평":"E8F5EE","악평":"FDEEEE","중립":"FFFBE8"}
     col_txt = {"호평":"16A34A","악평":"DC2626","중립":"CA8A04"}
     for ri, row in enumerate(data, 2):
-        ws.append([
-            row.get("출처",""), row.get("검색어",""), row.get("소분류",""),
-            row.get("품번",""),  row.get("품명",""),  row.get("가격언급",""),
-            row.get("title",""), row.get("link",""), row.get("날짜",""),
-            row.get("감성",""),  row.get("확신도",0.0),
-            row.get("channel",""), row.get("views",""), row.get("likes",""), row.get("comments","")
-        ])
+        ws.append([row.get(k,"") for k in ["출처","검색어","소분류","품번","품명","가격언급","title","link","날짜","감성","확신도","channel","views","likes","comments"]])
         s = row.get("감성","")
         if s in col_bg:
-            ws.cell(ri, 10).fill = openpyxl.styles.PatternFill(
-                start_color=col_bg[s], end_color=col_bg[s], fill_type="solid")
-            ws.cell(ri, 10).font = openpyxl.styles.Font(
-                color=col_txt[s], bold=True, name="Malgun Gothic")
+            ws.cell(ri,10).fill = openpyxl.styles.PatternFill(start_color=col_bg[s], end_color=col_bg[s], fill_type="solid")
+            ws.cell(ri,10).font = openpyxl.styles.Font(color=col_txt[s], bold=True, name="Malgun Gothic")
     for letter, width in zip("ABCDEFGHIJKLMNO", [8,20,15,15,20,12,45,50,12,8,10,20,10,10,10]):
         ws.column_dimensions[letter].width = width
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -764,13 +668,10 @@ def create_excel(data: list, start_date: str, end_date: str) -> io.BytesIO:
 # 헬퍼
 # ============================
 SENT_BADGE = {"호평":"badge-pos","악평":"badge-neg","중립":"badge-neu"}
-SENT_EMOJI = {"호평":"😊","악평":"😞","중립":"😐"}
 
-def icon(emoji: str) -> str:
-    return f'<span class="section-title-icon">{emoji}</span>'
-
-def card_icon(emoji: str) -> str:
-    return f'<span class="card-title-icon">{emoji}</span>'
+def icon(label: str) -> str:
+    """섹션 타이틀 아이콘 — 파란 박스 + 흰 텍스트 (7번 수정)"""
+    return f'<span class="section-title-icon">{label}</span>'
 
 
 # ============================
@@ -778,10 +679,14 @@ def card_icon(emoji: str) -> str:
 # ============================
 st.markdown("""
 <div class="app-header">
-    <div class="header-icon">🔵</div>
+    <div class="header-icon" style="color:#FFFFFF;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+    </div>
     <div>
-        <div class="header-title">LENS · 불만 SNS 감성분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 다이소 카페 · 유튜브 | KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
+        <div class="header-title">DAISO SNS-LENS · 불만 감성분석</div>
+        <div class="header-sub">네이버 블로그 · 지식인 · 다이소 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -791,48 +696,215 @@ st.markdown("""
 # 사이드바
 # ============================
 with st.sidebar:
+    # 로고 영역
     st.markdown("""
-    <div style="display:flex;align-items:center;gap:0.6rem;padding-bottom:1rem;border-bottom:1px solid #E2E8F0;margin-bottom:0.5rem;">
-        <div style="width:32px;height:32px;background:#0066CC;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:0.9rem;">🔵</div>
+    <div style="display:flex;align-items:center;gap:0.6rem;padding-bottom:1rem;border-bottom:1px solid #E2E8F0;margin-bottom:0.25rem;">
+        <div style="width:32px;height:32px;background:#0066CC;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+        </div>
         <div>
-            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">LENS 설정</div>
-            <div style="font-size:0.7rem;color:#718096;">분석 조건 입력</div>
+            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO SNS-LENS</div>
+            <div style="font-size:0.68rem;color:#718096;">Created by 데이터분석팀</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<span class="sb-label">🔍 검색어 (줄바꿈 구분 · 최대 10개)</span>', unsafe_allow_html=True)
-    keywords_input = st.text_area("", value="다이소 불만\n다이소 짜증\n다이소 별로",
-                                  height=130, label_visibility="collapsed")
-    st.markdown('<span class="sb-hint">각 줄 = 개별 검색어 (OR 조건으로 수집)</span>', unsafe_allow_html=True)
+    # ── ① 수집 채널 (위로 이동 + 아이콘 추가) ──────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon" style="color:#FFFFFF;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">수집 채널</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<span class="sb-label">📅 수집 기간</span>', unsafe_allow_html=True)
+    # 채널별 아이콘 체크박스 — Streamlit 체크박스 위에 HTML 라벨 오버레이
+    col_ch1, col_ch2 = st.columns(2)
+    with col_ch1:
+        # 네이버 블로그
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
+            </div>
+            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">블로그</span>
+        </div>""", unsafe_allow_html=True)
+        search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
+
+        # 네이버 카페
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;margin-top:0.4rem;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
+            </div>
+            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">카페</span>
+        </div>""", unsafe_allow_html=True)
+        search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+
+    with col_ch2:
+        # 네이버 지식인
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;">
+            <div style="width:22px;height:22px;background:#03C75A;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:#FFFFFF;font-size:0.6rem;font-weight:900;">N</span>
+            </div>
+            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">지식인</span>
+        </div>""", unsafe_allow_html=True)
+        search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
+
+        # 유튜브
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;margin-top:0.4rem;">
+            <div style="width:22px;height:22px;background:#FF0000;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
+            </div>
+            <span style="font-size:0.8rem;font-weight:500;color:#1A202C;">유튜브</span>
+        </div>""", unsafe_allow_html=True)
+        search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
+
+    # ── ② 검색어 ────────────────────────────────────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">검색어</span>
+    </div>
+    """, unsafe_allow_html=True)
+    keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
+                                  height=120, label_visibility="collapsed",
+                                  placeholder="줄바꿈으로 구분 · 최대 10개")
+    st.markdown('<span class="sb-hint">한 줄 = 검색어 1개 (OR 조건 수집, 최대 10개)</span>', unsafe_allow_html=True)
+
+    # ── ③ 수집 기간 (달력 선택) ─────────────────────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">수집 기간</span>
+    </div>
+    """, unsafe_allow_html=True)
     dc1, dc2 = st.columns(2)
-    with dc1: start_date = st.text_input("시작일", value="20250101", help="YYYYMMDD")
-    with dc2: end_date   = st.text_input("종료일", value="20250315", help="YYYYMMDD")
+    with dc1:
+        st.markdown('<span style="font-size:0.7rem;color:#718096;display:block;margin-bottom:0.2rem;">시작일</span>', unsafe_allow_html=True)
+        start_date = st.date_input("", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
+    with dc2:
+        st.markdown('<span style="font-size:0.7rem;color:#718096;display:block;margin-bottom:0.2rem;">종료일</span>', unsafe_allow_html=True)
+        end_date = st.date_input("", value=date.today(), label_visibility="collapsed", key="date_end")
 
-    st.markdown('<span class="sb-label">📡 수집 채널</span>', unsafe_allow_html=True)
-    cc1, cc2 = st.columns(2)
-    with cc1:
-        search_blog = st.checkbox("블로그",      value=True)
-        search_cafe = st.checkbox("다이소 카페", value=True)
-    with cc2:
-        search_kin  = st.checkbox("지식인",      value=True)
-        search_yt   = st.checkbox("유튜브",       value=True)
+    # ── ④ 수집 개수 (숫자 입력) ─────────────────────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">수집 개수</span>
+    </div>
+    """, unsafe_allow_html=True)
+    display_count = st.number_input(
+        "", min_value=10, max_value=3000, value=100, step=10,
+        label_visibility="collapsed",
+        help="키워드당 수집할 최대 건수 (10 ~ 3,000)"
+    )
+    st.markdown('<span class="sb-hint">키워드당 수집 건수 · 최소 10 / 최대 3,000<br>※ 네이버 API는 1회 최대 100건 제한 (자동 분할 수집)</span>', unsafe_allow_html=True)
 
-    st.markdown('<span class="sb-label">📊 수집 개수 (건/키워드)</span>', unsafe_allow_html=True)
-    display_count = st.slider("", 10, 100, 50, step=10, label_visibility="collapsed")
+    # ── ⑤ 악평 확신도 (숫자 입력 + 설명) ───────────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">악평 확신도 임계값</span>
+    </div>
+    """, unsafe_allow_html=True)
+    threshold = st.number_input(
+        "", min_value=40, max_value=95, value=60, step=5,
+        label_visibility="collapsed",
+        help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 악평으로 등록"
+    )
+    st.markdown("""
+    <span class="sb-hint">
+    · <b>40~55%</b> : 민감 — 불확실한 글도 악평 포함<br>
+    · <b>60~70%</b> : 권장 — 명확한 불만 위주 수집<br>
+    · <b>75%+</b> &nbsp;: 엄격 — 확실한 악평만 수집
+    </span>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<span class="sb-label">🎯 악평 확신도 임계값 (%)</span>', unsafe_allow_html=True)
-    threshold = st.slider("", 40, 90, 60, step=5, label_visibility="collapsed",
-                          help="이 수치 미만이면 중립으로 분류")
-
-    st.markdown('<span class="sb-label">📺 유튜브 댓글 분석</span>', unsafe_allow_html=True)
-    analyze_yt_comments = st.checkbox("댓글도 감성분석", value=True)
-    yt_comment_count    = st.slider("댓글 수집 건수", 10, 100, 30, step=10)
+    # ── ⑥ 유튜브 댓글 — 추가예정 ────────────────────────────
+    st.markdown("""
+    <div class="sb-section">
+        <div class="sb-section-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+        </div>
+        <span class="sb-section-text">유튜브 댓글 분석</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("""
+    <div class="badge-coming">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        추가 예정 기능입니다
+    </div>
+    <span class="sb-hint" style="margin-top:0.35rem;">유튜브 댓글 감성분석은 다음 버전에서 제공됩니다</span>
+    """, unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:1.25rem'></div>", unsafe_allow_html=True)
-    run_btn = st.button("🔵 분석 시작", use_container_width=True)
+    run_btn = st.button("분석 시작", use_container_width=True)
+
+    with st.expander("📌 YouTube API 키 발급"):
+        st.markdown("""
+**Step 1** Google Cloud Console 접속  
+https://console.cloud.google.com
+
+**Step 2** 새 프로젝트 생성
+
+**Step 3** YouTube Data API v3 활성화
+
+**Step 4** API 키 생성 → 복사
+
+**Step 5** secrets.toml 등록  
+`YOUTUBE_API_KEY = "AIzaSy..."`
+
+무료 일일 할당량 **10,000 유닛**
+        """)
+
+    with st.expander("📌 Google Sheets 품명 DB 연동"):
+        st.markdown("""
+**시트 컬럼** : `품번 | 품명 | 소분류`
+
+**Step 1** Sheets API 활성화  
+**Step 2** 서비스 계정 생성 → JSON 키  
+**Step 3** 시트 공유 → 서비스 계정 이메일 → 뷰어  
+**Step 4** secrets.toml 등록  
+```
+GSHEET_URL = "https://docs.google.com/..."
+[gcp_service_account]
+type = "service_account"
+...
+```
+        """)
 
 
 # ============================
@@ -844,112 +916,152 @@ if run_btn:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
     if not any([search_blog, search_kin, search_cafe, search_yt]):
         st.error("채널을 하나 이상 선택해주세요."); st.stop()
+    if start_date > end_date:
+        st.error("시작일이 종료일보다 늦습니다. 날짜를 확인해주세요."); st.stop()
 
-    # 모델 로드 알림
     with st.spinner("AI 앙상블 모델 초기화 중... (KR-ELECTRA + KLUE-RoBERTa)"):
         model_e = load_electra()
         model_r = load_roberta()
 
-    # ── 데이터 수집 ──────────────────────────────────────
+    # ── 수집 (네이버 API는 최대 100건이므로 display_count > 100이면 분할) ──
+    def collect_naver_paged(query, search_type, total):
+        """네이버 API 100건 제한 → 최대 10페이지 반복 수집"""
+        all_items = []
+        fetched = 0
+        start_idx = 1
+        per_page = 100
+        while fetched < total:
+            url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
+            headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+            params  = {"query": query, "display": per_page, "start": start_idx, "sort": "date"}
+            try:
+                resp  = requests.get(url, headers=headers, params=params, timeout=10)
+                items = resp.json().get("items", [])
+            except Exception:
+                break
+            if not items: break
+            label = "블로그" if search_type == "blog" else "지식인"
+            for item in items: item["출처"] = label; item["검색어"] = query
+            all_items.extend(items)
+            fetched   += len(items)
+            start_idx += per_page
+            if len(items) < per_page: break  # 더 이상 없으면 종료
+        return all_items[:total]
+
+    def collect_cafe_paged(query, total):
+        all_items = []
+        fetched = 0; start_idx = 1; per_page = 100
+        while fetched < total:
+            url     = "https://openapi.naver.com/v1/search/cafearticle.json"
+            headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+            params  = {"query": query, "display": per_page, "start": start_idx, "sort": "date"}
+            try:
+                items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
+            except Exception: break
+            if not items: break
+            for item in items:
+                cn = item.get("cafename","")
+                if "다이소" in cn or "DAISO" in cn.upper():
+                    item["출처"] = "카페"; item["검색어"] = query; item["channel"] = cn
+                    all_items.append(item)
+            fetched   += len(items)
+            start_idx += per_page
+            if len(items) < per_page: break
+        return all_items[:total]
+
     all_items, collect_log = [], []
-    prog_collect = st.progress(0)
-    for idx, kw in enumerate(keywords):
+    prog = st.progress(0)
+    total_steps = len(keywords) * sum([search_blog, search_kin, search_cafe, search_yt])
+    step = 0
+
+    for kw in keywords:
         if search_blog:
-            r = search_naver(kw, "blog", display_count)
+            r = collect_naver_paged(kw, "blog", display_count)
             all_items.extend(r); collect_log.append(f"블로그/{kw}/{len(r)}건")
+            step += 1; prog.progress(step / max(total_steps, 1))
         if search_kin:
-            r = search_naver(kw, "kin", display_count)
+            r = collect_naver_paged(kw, "kin", display_count)
             all_items.extend(r); collect_log.append(f"지식인/{kw}/{len(r)}건")
+            step += 1; prog.progress(step / max(total_steps, 1))
         if search_cafe:
-            r = search_naver_cafe(kw, display_count)
+            r = collect_cafe_paged(kw, display_count)
             all_items.extend(r); collect_log.append(f"카페/{kw}/{len(r)}건")
+            step += 1; prog.progress(step / max(total_steps, 1))
         if search_yt and YOUTUBE_API_KEY:
             r = search_youtube(kw, max_results=min(display_count, 50))
             all_items.extend(r); collect_log.append(f"유튜브/{kw}/{len(r)}건")
-        prog_collect.progress((idx+1)/len(keywords))
-    prog_collect.empty()
+            step += 1; prog.progress(step / max(total_steps, 1))
+    prog.empty()
 
     # 중복 제거
     seen, unique_items = set(), []
     for item in all_items:
-        lnk = item.get("link", "")
-        if lnk not in seen:
-            seen.add(lnk); unique_items.append(item)
+        lnk = item.get("link","")
+        if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
-    # 날짜 필터
+    # 유심 관련 게시글 제외
+    USIM_EXCLUDE_KW = [
+        "유심","USIM","유심칩","유심카드","심카드","SIM카드",
+        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
+    ]
+    def is_usim_related(it):
+        text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
+        return any(kw.upper() in text for kw in USIM_EXCLUDE_KW)
+
+    before_usim  = len(unique_items)
+    unique_items = [it for it in unique_items if not is_usim_related(it)]
+    usim_excluded = before_usim - len(unique_items)
+
     filtered = filter_by_date(unique_items, start_date, end_date)
     if not filtered:
-        st.warning("해당 기간에 결과가 없습니다. 날짜 범위를 넓혀보세요."); st.stop()
+        st.warning("해당 기간에 결과가 없습니다. 날짜 범위나 검색어를 확인해주세요."); st.stop()
 
+    usim_note = f" &nbsp;·&nbsp; 유심 관련 <strong>{usim_excluded}</strong>건 제외" if usim_excluded > 0 else ""
     st.markdown(f"""
     <div class="card" style="border-left:3px solid #0066CC;">
         <span style="font-size:0.85rem;color:#0066CC;font-weight:600;">
-        ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후)
+        ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후){usim_note}
         </span><br>
         <span style="font-size:0.72rem;color:#718096;">{' &nbsp;|&nbsp; '.join(collect_log)}</span>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 감성 분석 ─────────────────────────────────────────
-    results, yt_comment_results = [], []
+    # ── 감성 분석 ──────────────────────────────────────────
+    results = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
 
     for i, item in enumerate(filtered):
-        src   = item.get("출처", "")
-        title = clean_text(item.get("title", ""))
-        desc  = clean_text(item.get("description", ""))
+        src   = item.get("출처","")
+        title = clean_text(item.get("title",""))
+        desc  = clean_text(item.get("description",""))
         full  = title + " " + desc
 
         sentiment, score = ai_ensemble(full, model_e, model_r)
         if score < threshold and sentiment != "중립":
             sentiment = "중립"
 
-        if src == "유튜브":
-            date_str = item.get("날짜", "")
-        else:
-            dt = parse_date(item)
-            date_str = dt.strftime("%Y-%m-%d") if dt else ""
+        date_str = item.get("날짜","") if src == "유튜브" else (
+            lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
+        )(parse_date(item))
 
         prod_code = extract_product_code(full) if src != "유튜브" else ""
         prod_name = match_product_name(prod_code)
 
-        row = {
-            "출처":    src,
-            "검색어":  item.get("검색어", ""),
+        results.append({
+            "출처":    src, "검색어": item.get("검색어",""),
             "소분류":  extract_subcategory(full),
-            "품번":    prod_code,
-            "품명":    prod_name,
+            "품번":    prod_code, "품명": prod_name,
             "가격언급":extract_price(full) if src != "유튜브" else "",
-            "title":  title,
-            "link":   item.get("link", ""),
-            "날짜":   date_str,
-            "감성":   sentiment,
-            "확신도": score,
+            "title":  title, "link": item.get("link",""),
+            "날짜":   date_str, "감성": sentiment, "확신도": score,
             "channel":item.get("channel","") or item.get("cafename",""),
-            "views":  item.get("views",""),
-            "likes":  item.get("likes",""),
-            "comments":item.get("comments",""),
-            "video_id":item.get("video_id",""),
-            "thumbnail":item.get("thumbnail",""),
-        }
-        results.append(row)
-
-        if src == "유튜브" and analyze_yt_comments and item.get("video_id"):
-            for cm in fetch_youtube_comments(item["video_id"], yt_comment_count):
-                cs, csc = ai_ensemble(cm["text"], model_e, model_r)
-                if csc < threshold and cs != "중립": cs = "중립"
-                yt_comment_results.append({
-                    "검색어": item.get("검색어",""), "video_id": item["video_id"],
-                    "영상제목": title, "댓글": cm["text"],
-                    "좋아요": cm["likes"], "날짜": cm["published"],
-                    "감성": cs, "확신도": csc,
-                })
+            "views":  item.get("views",""), "likes": item.get("likes",""),
+            "comments":item.get("comments",""), "video_id":item.get("video_id",""),
+        })
 
         progress_bar.progress((i+1)/len(filtered))
-        status_text.markdown(
-            f'<span style="font-size:0.78rem;color:#718096;">분석 중 {i+1} / {len(filtered)}</span>',
-            unsafe_allow_html=True)
+        status_text.markdown(f'<span style="font-size:0.78rem;color:#718096;">분석 중 {i+1} / {len(filtered)}</span>', unsafe_allow_html=True)
 
     progress_bar.empty(); status_text.empty()
 
@@ -960,93 +1072,78 @@ if run_btn:
         "📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"
     ])
 
-    # ── 공통 집계 ──────────────────────────────────────────
+    # ── 집계 ──────────────────────────────────────────────
     total = len(results)
     pos   = sum(1 for r in results if r["감성"]=="호평")
     neg   = sum(1 for r in results if r["감성"]=="악평")
     neu   = sum(1 for r in results if r["감성"]=="중립")
 
-    # 소분류 집계
     all_subs = []
     for r in results:
-        if r.get("소분류"):
-            all_subs.extend([s.strip() for s in r["소분류"].split(",") if s.strip()])
+        if r.get("소분류"): all_subs.extend([s.strip() for s in r["소분류"].split(",") if s.strip()])
     sub_cnt = Counter(all_subs)
 
-    # 품번+품명 집계
     all_codes = []
     for r in results:
         if r.get("품번"):
             for c in r["품번"].split(","):
                 c = c.strip()
-                if c:
-                    nm = r.get("품명","")
-                    all_codes.append(f"{c} {nm}".strip())
+                if c: all_codes.append(f"{c} {r.get('품명','') }".strip())
     code_cnt = Counter(all_codes)
 
-    # 일자별 악평 건수
     date_neg = {}
     for r in results:
         if r["감성"] == "악평" and r.get("날짜"):
-            try:
-                month = r["날짜"][:7]  # YYYY-MM
-                date_neg[month] = date_neg.get(month, 0) + 1
-            except Exception:
-                pass
+            month = r["날짜"][:7]
+            date_neg[month] = date_neg.get(month, 0) + 1
 
-    # ── 📊 대시보드 ────────────────────────────────────────
+    # ── 📊 대시보드 ───────────────────────────────────────
     with tab_dash:
-        # ① 메트릭 카드
-        st.markdown(f'{icon("📈")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span>', unsafe_allow_html=True)
+        # 요약 메트릭
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
-        for col, cls, lbl, val, pct, em in [
-            (c1,"total","전체 수집",  str(total), "100%",                                    "📋"),
-            (c2,"pos",  "호평",      str(pos),   f"{round(pos/total*100) if total else 0}%","😊"),
-            (c3,"neg",  "악평",      str(neg),   f"{round(neg/total*100) if total else 0}%","😞"),
-            (c4,"neu",  "중립",      str(neu),   f"{round(neu/total*100) if total else 0}%","😐"),
+        for col, cls, lbl, val, pct, ic_txt in [
+            (c1,"total","전체 수집",  str(total), "100%",                                    "전체"),
+            (c2,"pos",  "호평",      str(pos),   f"{round(pos/total*100) if total else 0}%","호평"),
+            (c3,"neg",  "악평",      str(neg),   f"{round(neg/total*100) if total else 0}%","악평"),
+            (c4,"neu",  "중립",      str(neu),   f"{round(neu/total*100) if total else 0}%","중립"),
         ]:
             with col:
                 st.markdown(f"""
                 <div class="metric-card {cls}">
                     <div class="metric-label">
-                        <span class="metric-icon {cls}">{em}</span>{lbl}
+                        <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>
+                        {lbl}
                     </div>
                     <div class="metric-value">{val}</div>
                     <div class="metric-pct">{pct}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
 
-        # ① 대시보드 서브 메트릭 (소분류 수 / 품번 수 / 품명 수)
+        # 서브 메트릭
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
         d1, d2, d3 = st.columns(3)
-        sub_unique   = len(sub_cnt)
-        code_unique  = len(set(r["품번"] for r in results if r.get("품번")))
-        name_unique  = len(set(r["품명"] for r in results if r.get("품명")))
-        for col, lbl, val, ic in [
-            (d1,"소분류 수",   str(sub_unique),  "🗂"),
-            (d2,"품번 수",     str(code_unique), "🔢"),
-            (d3,"품명 수",     str(name_unique), "🏷"),
-        ]:
+        sub_u  = len(sub_cnt)
+        code_u = len(set(r["품번"] for r in results if r.get("품번")))
+        name_u = len(set(r["품명"] for r in results if r.get("품명")))
+        for col, lbl, val in [(d1,"소분류 수",str(sub_u)),(d2,"품번 수",str(code_u)),(d3,"품명 수",str(name_u))]:
             with col:
                 st.markdown(f"""
-                <div class="card" style="text-align:center;padding:1rem;">
-                    <div style="font-size:1.5rem;">{ic}</div>
+                <div class="card" style="text-align:center;padding:1rem 0.75rem;">
                     <div style="font-size:1.6rem;font-weight:700;color:#0066CC;font-family:'Inter',sans-serif;">{val}</div>
-                    <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;">{lbl}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
+                </div>""", unsafe_allow_html=True)
 
-        # ② 월별 불만건수 그래프
+        # 월별 악평 그래프
         if date_neg:
-            st.markdown(f'{icon("📅")} <span style="font-size:0.95rem;font-weight:600;">월별 악평 건수</span>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 악평 건수</span></div>', unsafe_allow_html=True)
             chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","악평수"]).sort_values("월")
             chart = (
                 alt.Chart(chart_df)
                 .mark_bar(color="#0066CC", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
                 .encode(
-                    x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0)),
-                    y=alt.Y("악평수:Q", axis=alt.Axis(title="악평 건수")),
-                    tooltip=["월","악평수"]
+                    x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0, labelFontSize=12)),
+                    y=alt.Y("악평수:Q", axis=alt.Axis(title="악평 건수", titleFontSize=11)),
+                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("악평수:Q", title="건수")]
                 )
                 .properties(height=220)
                 .configure_view(strokeWidth=0)
@@ -1054,26 +1151,26 @@ if run_btn:
             )
             st.altair_chart(chart, use_container_width=True)
 
-        # ③ TOP10
+        # TOP 10
         col_top1, col_top2 = st.columns(2)
         with col_top1:
-            st.markdown(f'{icon("🏷")} <span style="font-size:0.95rem;font-weight:600;">소분류 TOP 10</span>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("분류")} <span style="font-size:0.95rem;font-weight:600;">소분류 TOP 10</span></div>', unsafe_allow_html=True)
             html = ""
             for rank, (name, count) in enumerate(sub_cnt.most_common(10), 1):
                 cls = "r1" if rank == 1 else ""
-                html += f'<div class="top-item"><div class="top-rank {cls}">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
-            st.markdown(f'<div class="card">{html if html else "<span style=\'color:#718096;font-size:0.82rem;\'>소분류 데이터 없음</span>"}</div>', unsafe_allow_html=True)
+                html += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
+            st.markdown(f'<div class="card">{html or "<span style=\'color:#718096;font-size:0.82rem;\'>소분류 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
         with col_top2:
-            st.markdown(f'{icon("🔢")} <span style="font-size:0.95rem;font-weight:600;">주요 품번+품명 TOP 10</span>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("품번")} <span style="font-size:0.95rem;font-weight:600;">주요 품번+품명 TOP 10</span></div>', unsafe_allow_html=True)
             html2 = ""
             for rank, (name, count) in enumerate(code_cnt.most_common(10), 1):
                 cls = "r1" if rank == 1 else ""
-                html2 += f'<div class="top-item"><div class="top-rank {cls}">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
-            st.markdown(f'<div class="card">{html2 if html2 else "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
+                html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
+            st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
-        # ④ 글 내용 출력 (악평 TOP 20)
-        st.markdown(f'{icon("📄")} <span style="font-size:0.95rem;font-weight:600;">주요 악평 글 목록</span>', unsafe_allow_html=True)
+        # 악평 글 목록
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("악평")} <span style="font-size:0.95rem;font-weight:600;">주요 악평 글 목록</span></div>', unsafe_allow_html=True)
         neg_results = [r for r in results if r["감성"] == "악평"]
         if neg_results:
             for r in neg_results[:20]:
@@ -1091,13 +1188,12 @@ if run_btn:
                         {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
                         <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
         else:
             st.info("악평으로 분류된 글이 없습니다.")
 
         # 다운로드
-        st.markdown(f'{icon("⬇")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span>', unsafe_allow_html=True)
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("↓")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span></div>', unsafe_allow_html=True)
         dl1, dl2 = st.columns(2)
         with dl1:
             buf = create_excel(results, start_date, end_date)
@@ -1106,39 +1202,38 @@ if run_btn:
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
         with dl2:
-            df_all = pd.DataFrame(results)
-            csv = df_all.to_csv(index=False, encoding="utf-8-sig")
+            csv = pd.DataFrame(results).to_csv(index=False, encoding="utf-8-sig")
             st.download_button("📥 CSV 다운로드", csv.encode("utf-8-sig"),
                 f"LENS_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
-    # ── 채널별 상세 결과 공통 함수 ────────────────────────
+    # ── 채널 상세 공통 함수 ────────────────────────────────
     def render_detail_tab(src_results, src_name):
         if not src_results:
-            st.info(f"{src_name} 수집 결과가 없습니다.")
-            return
+            st.info(f"{src_name} 수집 결과가 없습니다."); return
         t  = len(src_results)
         p  = sum(1 for r in src_results if r["감성"]=="호평")
         n  = sum(1 for r in src_results if r["감성"]=="악평")
         ne = sum(1 for r in src_results if r["감성"]=="중립")
 
         c1,c2,c3,c4 = st.columns(4)
-        for col, cls, lbl, val, em in [
-            (c1,"total","전체",str(t),"📋"),
-            (c2,"pos","호평",str(p),"😊"),
-            (c3,"neg","악평",str(n),"😞"),
-            (c4,"neu","중립",str(ne),"😐"),
+        for col, cls, lbl, val, ic_txt in [
+            (c1,"total","전체",str(t),"전체"),
+            (c2,"pos","호평",str(p),"호평"),
+            (c3,"neg","악평",str(n),"악평"),
+            (c4,"neu","중립",str(ne),"중립"),
         ]:
             with col:
                 st.markdown(f"""
                 <div class="metric-card {cls}">
-                    <div class="metric-label"><span class="metric-icon {cls}">{em}</span>{lbl}</div>
+                    <div class="metric-label">
+                        <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
+                    </div>
                     <div class="metric-value">{val}</div>
                     <div class="metric-pct">{round(int(val)/t*100) if t else 0}%</div>
-                </div>
-                """, unsafe_allow_html=True)
+                </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
-        # 검색어별 분포
+
         kw_stats = {}
         for r in src_results:
             kw = r.get("검색어","")
@@ -1149,10 +1244,10 @@ if run_btn:
             t2 = sum(s.values())
             kw_rows.append({"검색어":kw,"호평":s["호평"],"악평":s["악평"],"중립":s["중립"],
                             "합계":t2,"악평률(%)":round(s["악평"]/t2*100,1) if t2 else 0})
-        st.markdown(f'{icon("🔍")} <span style="font-size:0.95rem;font-weight:600;">검색어별 분포</span>', unsafe_allow_html=True)
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("검색")} <span style="font-size:0.95rem;font-weight:600;">검색어별 분포</span></div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(kw_rows), use_container_width=True, hide_index=True, height=160)
 
-        st.markdown(f'{icon("📄")} <span style="font-size:0.95rem;font-weight:600;">상세 결과</span>', unsafe_allow_html=True)
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과</span></div>', unsafe_allow_html=True)
         for r in src_results:
             b = SENT_BADGE.get(r["감성"],"")
             st.markdown(f"""
@@ -1169,119 +1264,89 @@ if run_btn:
                     {'<span>💰 ' + r['가격언급'] + '</span>' if r.get('가격언급') else ''}
                     <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
-        st.download_button(f"📥 {src_name} CSV 다운로드",
-            src_csv.encode("utf-8-sig"),
-            f"LENS_{src_name}_{start_date}_{end_date}.csv",
-            "text/csv", use_container_width=True)
+        st.download_button(f"📥 {src_name} CSV 다운로드", src_csv.encode("utf-8-sig"),
+            f"LENS_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
-    # ── 📝 블로그 ──────────────────────────────────────────
     with tab_blog:
         render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
 
-    # ── 💬 지식인 ─────────────────────────────────────────
     with tab_kin:
         render_detail_tab([r for r in results if r["출처"]=="지식인"], "지식인")
 
-    # ── ☕ 카페 ───────────────────────────────────────────
     with tab_cafe:
         render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
 
-    # ── ▶ 유튜브 ─────────────────────────────────────────
+    # ── ▶ 유튜브 ────────────────────────────────────────────
     with tab_yt:
         yt_results = [r for r in results if r["출처"]=="유튜브"]
         if not yt_results:
             if not YOUTUBE_API_KEY:
-                st.warning("YOUTUBE_API_KEY가 secrets에 없습니다. 사이드바 안내를 참고하세요.")
+                st.warning("YOUTUBE_API_KEY가 secrets에 없습니다.")
             else:
                 st.info("유튜브 수집 결과가 없습니다.")
         else:
-            yt_t = len(yt_results)
-            yt_p = sum(1 for r in yt_results if r["감성"]=="호평")
-            yt_n = sum(1 for r in yt_results if r["감성"]=="악평")
+            yt_t  = len(yt_results)
+            yt_p  = sum(1 for r in yt_results if r["감성"]=="호평")
+            yt_n  = sum(1 for r in yt_results if r["감성"]=="악평")
             yt_ne = sum(1 for r in yt_results if r["감성"]=="중립")
-
             yc1,yc2,yc3,yc4 = st.columns(4)
-            for col, cls, lbl, val, em in [
-                (yc1,"total","영상",str(yt_t),"▶"),
-                (yc2,"pos","호평",str(yt_p),"😊"),
-                (yc3,"neg","악평",str(yt_n),"😞"),
-                (yc4,"neu","중립",str(yt_ne),"😐"),
+            for col, cls, lbl, val, ic_txt in [
+                (yc1,"total","영상",str(yt_t),"영상"),
+                (yc2,"pos","호평",str(yt_p),"호평"),
+                (yc3,"neg","악평",str(yt_n),"악평"),
+                (yc4,"neu","중립",str(yt_ne),"중립"),
             ]:
                 with col:
                     st.markdown(f"""
                     <div class="metric-card {cls}">
-                        <div class="metric-label"><span class="metric-icon {cls}">{em}</span>{lbl}</div>
+                        <div class="metric-label">
+                            <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
+                        </div>
                         <div class="metric-value">{val}</div>
                         <div class="metric-pct">{round(int(val)/yt_t*100) if yt_t else 0}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    </div>""", unsafe_allow_html=True)
 
-            st.markdown(f'{icon("▶")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 (조회수 순)</span>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("영상")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 (조회수 순)</span></div>', unsafe_allow_html=True)
             for r in sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)[:20]:
                 b = SENT_BADGE.get(r["감성"],"")
-                views    = f"{r['views']:,}"    if isinstance(r.get("views"),    int) else "-"
-                likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),    int) else "-"
-                comments = f"{r['comments']:,}" if isinstance(r.get("comments"), int) else "-"
+                views    = f"{r['views']:,}"    if isinstance(r.get("views"),int)    else "-"
+                likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),int)    else "-"
+                comments = f"{r['comments']:,}" if isinstance(r.get("comments"),int) else "-"
                 st.markdown(f"""
-                <div class="result-card" style="display:flex;gap:1rem;align-items:flex-start;">
-                    <div style="flex:1;">
-                        <div class="result-title">
-                            <a href="{r['link']}" target="_blank" style="color:#1A202C;text-decoration:none;">{r['title']}</a>
-                        </div>
-                        <div class="result-meta">
-                            <span>📺 {r.get('channel','')}</span>
-                            <span>📅 {r['날짜']}</span>
-                            <span>▶ {views}</span>
-                            <span>♥ {likes}</span>
-                            <span>💬 {comments}</span>
-                            <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
-                        </div>
+                <div class="result-card">
+                    <div class="result-title">
+                        <a href="{r['link']}" target="_blank" style="color:#1A202C;text-decoration:none;">{r['title']}</a>
                     </div>
+                    <div class="result-meta">
+                        <span>📺 {r.get('channel','')}</span>
+                        <span>📅 {r['날짜']}</span>
+                        <span>▶ {views}</span>
+                        <span>♥ {likes}</span>
+                        <span>💬 {comments}</span>
+                        <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+            # 댓글 분석 — 추가 예정
+            st.markdown("""
+            <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;text-align:center;">
+                <div style="font-size:0.9rem;font-weight:600;color:#64748B;margin-bottom:0.3rem;">💬 유튜브 댓글 감성분석</div>
+                <div class="badge-coming" style="display:inline-flex;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    추가 예정 기능입니다
                 </div>
-                """, unsafe_allow_html=True)
-
-            # 댓글 분석
-            if yt_comment_results:
-                st.markdown(f'{icon("💬")} <span style="font-size:0.95rem;font-weight:600;">댓글 감성 분석</span>', unsafe_allow_html=True)
-                cm_t  = len(yt_comment_results)
-                cm_p  = sum(1 for c in yt_comment_results if c["감성"]=="호평")
-                cm_n  = sum(1 for c in yt_comment_results if c["감성"]=="악평")
-                cm_ne = sum(1 for c in yt_comment_results if c["감성"]=="중립")
-                cc1,cc2,cc3,cc4 = st.columns(4)
-                for col, cls, lbl, val, em in [
-                    (cc1,"total","댓글",str(cm_t),"💬"),
-                    (cc2,"pos","호평",str(cm_p),"😊"),
-                    (cc3,"neg","악평",str(cm_n),"😞"),
-                    (cc4,"neu","중립",str(cm_ne),"😐"),
-                ]:
-                    with col:
-                        st.markdown(f"""
-                        <div class="metric-card {cls}">
-                            <div class="metric-label"><span class="metric-icon {cls}">{em}</span>{lbl}</div>
-                            <div class="metric-value">{val}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                cm_df = pd.DataFrame(yt_comment_results)[["검색어","영상제목","댓글","날짜","좋아요","감성","확신도"]]
-                st.dataframe(cm_df, use_container_width=True, height=360, hide_index=True)
-
-                cm_wb = openpyxl.Workbook(); cm_ws = cm_wb.active; cm_ws.title="유튜브댓글"
-                cm_ws.append(["검색어","영상제목","댓글","날짜","좋아요","감성","확신도"])
-                for row in yt_comment_results:
-                    cm_ws.append([row.get(k,"") for k in ["검색어","영상제목","댓글","날짜","좋아요","감성","확신도"]])
-                cm_buf = io.BytesIO(); cm_wb.save(cm_buf); cm_buf.seek(0)
-                st.download_button("📥 댓글 분석 EXCEL", cm_buf,
-                    f"LENS_YT_Comments_{start_date}_{end_date}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True)
+                <div style="font-size:0.75rem;color:#94A3B8;margin-top:0.5rem;">다음 버전에서 제공될 예정입니다</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # 하단
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
-        <span style="font-size:0.75rem;color:#A0AEC0;">LENS · 불만 SNS 감성분석 시스템 · KR-ELECTRA × KLUE-RoBERTa Ensemble</span>
+        <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS-LENS · KR-ELECTRA × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
     </div>
     """, unsafe_allow_html=True)
