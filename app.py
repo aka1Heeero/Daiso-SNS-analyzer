@@ -796,12 +796,12 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">DAISO</div>
+        ">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS ISSUE FINDER · 불만 감성분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
+        <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
+        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa Collaboration</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -817,7 +817,7 @@ with st.sidebar:
             <span style="color:#FFFFFF;font-size:0.65rem;font-weight:900;letter-spacing:0.05em;font-family:'Inter',sans-serif;">D</span>
         </div>
         <div>
-            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">SNS ISSUE FINDER</div>
+            <div style="font-weight:700;font-size:0.95rem;color:#1A202C;">DAISO ISSUE FINDER</div>
             <div style="font-size:0.68rem;color:#718096;">Created by 데이터분석팀</div>
         </div>
     </div>
@@ -891,7 +891,7 @@ with st.sidebar:
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
         </div>
-        <span class="sb-section-text">검색어</span>
+        <span class="sb-section-text">분석 검색어</span>
     </div>
     """, unsafe_allow_html=True)
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
@@ -910,7 +910,7 @@ with st.sidebar:
                 <line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
         </div>
-        <span class="sb-section-text">수집 기간</span>
+        <span class="sb-section-text">분석 기간</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -932,7 +932,7 @@ with st.sidebar:
                 <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
             </svg>
         </div>
-        <span class="sb-section-text">수집 개수</span>
+        <span class="sb-section-text">분석개수</span>
     </div>
     """, unsafe_allow_html=True)
     display_count = st.number_input(
@@ -951,7 +951,7 @@ with st.sidebar:
                 <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
         </div>
-        <span class="sb-section-text"> 확신</span>
+        <span class="sb-section-text">신뢰도 조정</span>
     </div>
     """, unsafe_allow_html=True)
     threshold = st.number_input(
@@ -1070,7 +1070,7 @@ if run_btn:
 
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
-        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
+        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심","자","정력","정액"
     ]
     def is_usim_related(it):
         text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
