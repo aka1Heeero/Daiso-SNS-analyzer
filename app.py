@@ -78,7 +78,6 @@ html, body, .stApp {
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
     outline: none !important;
 }
-/* 달력 날짜 선택 input */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
@@ -91,7 +90,6 @@ html, body, .stApp {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
 }
-/* ── 날짜 입력 간격 축소 (3번 수정) ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
@@ -265,42 +263,31 @@ html, body, .stApp {
 }
 .sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; display: block; line-height: 1.5; }
 
-/* ── 채널 체크박스 인라인 (2번 수정) ── */
-.channel-inline-row {
-    display: flex; align-items: center; gap: 0.4rem;
-    padding: 0.35rem 0; margin-bottom: 0.2rem;
+/* ── [FIX 3] 채널 체크박스 — 세로 가운데 정렬 통일 ── */
+.ch-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0;
+    min-height: 32px;
 }
 .ch-icon {
-    width: 22px; height: 22px; border-radius: 5px;
+    width: 20px; height: 20px; border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.6rem; color: #FFFFFF !important;
+    font-size: 0.55rem; color: #FFFFFF !important;
     font-weight: 900; flex-shrink: 0;
 }
 .ch-naver   { background: #03C75A; }
 .ch-youtube { background: #FF0000; }
-.ch-label   { font-size: 0.82rem; font-weight: 500; color: var(--text); min-width: 36px; }
-
-/* 체크박스를 인라인 아이콘 옆에 붙이기 위한 스타일 */
-.channel-cb-wrap {
-    display: flex; align-items: center; gap: 0; margin: 0;
-}
-.channel-cb-wrap .stCheckbox {
-    margin: 0 !important; padding: 0 !important;
-}
-.channel-cb-wrap .stCheckbox > label {
-    padding: 0 !important; gap: 0 !important; min-height: unset !important;
-}
-.channel-cb-wrap .stCheckbox > label > span:last-child {
-    display: none !important;  /* 기본 라벨 텍스트 숨김 */
+.ch-label   {
+    font-size: 0.82rem; font-weight: 500;
+    color: var(--text) !important;
+    line-height: 1;
 }
 
 /* ── 숫자 입력 ── */
-[data-testid="stNumberInput"] > div {
-    border-radius: 8px !important;
-}
-[data-testid="stNumberInput"] button {
-    color: var(--primary) !important;
-}
+[data-testid="stNumberInput"] > div { border-radius: 8px !important; }
+[data-testid="stNumberInput"] button { color: var(--primary) !important; }
 
 /* ── 버튼 기본 ── */
 .stButton > button {
@@ -316,7 +303,7 @@ html, body, .stApp {
     box-shadow: 0 4px 12px rgba(0,102,204,0.3) !important;
 }
 
-/* ── 분석 시작 버튼 — 노란색, 굵고 크게 (5번 수정) ── */
+/* ── 분석 시작 버튼 — 노란색 ── */
 [data-testid="stSidebar"] .stButton > button {
     background: #FFD600 !important;
     color: #1A202C !important;
@@ -368,13 +355,26 @@ html, body, .stApp {
 hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 0 !important; }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* 추가예정 뱃지 */
 .badge-coming {
     display: inline-flex; align-items: center; gap: 0.3rem;
     background: #F1F5F9; color: #64748B;
     border: 1px dashed #CBD5E1;
     padding: 0.35rem 0.75rem; border-radius: 6px;
     font-size: 0.78rem; font-weight: 500;
+}
+
+/* 체크박스 세로 정렬 */
+[data-testid="stSidebar"] .stCheckbox {
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: unset !important;
+}
+[data-testid="stSidebar"] .stCheckbox label {
+    padding: 0 !important;
+    min-height: unset !important;
+    gap: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -423,12 +423,20 @@ def load_product_db():
         sh  = gc.open_by_url(st.secrets["GSHEET_URL"])
         df  = pd.DataFrame(sh.sheet1.get_all_records())
         df.columns = [c.strip() for c in df.columns]
+        # [FIX 5] 품번 컬럼을 문자열로 통일, 앞뒤 공백 제거
+        if "품번" in df.columns:
+            df["품번"] = df["품번"].astype(str).str.strip()
         return df
     except Exception as e:
         st.warning(f"⚠ 품명 DB 로드 실패: {e}")
         return pd.DataFrame(columns=["품번", "품명", "소분류"])
 
 PRODUCT_DB = load_product_db()
+
+# [FIX 5] 구글시트에 등록된 품번 목록 (숫자만)
+VALID_PRODUCT_CODES = set()
+if not PRODUCT_DB.empty and "품번" in PRODUCT_DB.columns:
+    VALID_PRODUCT_CODES = set(PRODUCT_DB["품번"].dropna().astype(str).str.strip().tolist())
 
 def load_subcategories():
     if not PRODUCT_DB.empty and "소분류" in PRODUCT_DB.columns:
@@ -466,12 +474,16 @@ NEGATIVE_KW = [
     "싸구려","허접","대충","클레임","AS","환급","반품","재구매 안","비추","별점 1",
     "별점1","1점","속았","낚였","사기","뻥","가짜","품질 나쁜","품질이 나쁜",
     "뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠","못써","쓸모없어",
-    "수량적음", "색이다름", "색상상이", "성능과장", "원산지 불명확", "색감차이",
-    "과포장", "과점착", "색번짐", "이염",
+    "수량적음","색이다름","색상상이","성능과장","원산지 불명확","색감차이",
+    "과포장","과점착","색번짐","이염","후회","별로야","별로네","글쎄","그냥저냥",
+    "생각보다 별로","기대 이하","실패","구매실패","돈낭비","돈 낭비","비싸","불합리",
+    "사지마","사지 마","추천안","추천 안","별1","1개","뒤틀","휘어","금방망가",
+    "금방 망가","오래못가","오래 못가","금방부서","금방 부서",
 ]
 POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
-    "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱"
+    "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱",
+    "갓성비","득템","완전좋","완전 좋","행복","사랑","최애","예쁘다","예쁜",
 ]
 LABEL_MAP = {
     "positive":"호평","pos":"호평","LABEL_2":"호평","호평":"호평",
@@ -483,8 +495,8 @@ LABEL_MAP = {
 def rule_based(text: str):
     neg = sum(1 for kw in NEGATIVE_KW if kw in text)
     pos = sum(1 for kw in POSITIVE_KW if kw in text)
-    if neg > pos:  return "악평", min(0.6 + neg * 0.07, 0.97)
-    if pos > neg:  return "호평", min(0.55 + pos * 0.07, 0.97)
+    if neg > pos:  return "악평", min(0.65 + neg * 0.08, 0.98)
+    if pos > neg:  return "호평", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
 
 def ai_ensemble(text: str, model_e, model_r) -> tuple:
@@ -505,15 +517,41 @@ def ai_ensemble(text: str, model_e, model_r) -> tuple:
                 if lbl: votes[lbl] += it["score"] * 1.0
         except Exception: pass
     rule_lbl, rule_sc = rule_based(text)
-    votes[rule_lbl] += rule_sc * 0.6
+    votes[rule_lbl] += rule_sc * 0.8  # [FIX 6] 룰베이스 가중치 상향
     total = sum(votes.values())
-    if total == 0: return "중립", 50.0
+    if total == 0: return "중립", 50
     best  = max(votes, key=votes.get)
-    score = round(votes[best] / total * 100, 1)
+    score = round(votes[best] / total * 100)  # [FIX 2] 정수 변환
+    # [FIX 6] 악평 억제 조건 완화: ELECTRA 임계값 낮추고 키워드 1개도 허용
     neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in text)
-    if best == "악평" and not (electra_neg_score >= 0.60 and neg_kw_cnt >= 2):
-        best = "중립"; score = max(score * 0.7, 45.0)
+    if best == "악평" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
+        best = "중립"; score = max(round(score * 0.7), 45)
     return best, score
+
+
+# ============================
+# [FIX 1] 키워드 관련성 필터 — 반드시 '다이소' 포함 확인
+# ============================
+DAISO_VARIANTS = ["다이소", "DAISO", "daiso"]
+
+def is_daiso_related(item: dict) -> bool:
+    """제목+본문에 다이소 관련 키워드가 포함되어 있는지 확인"""
+    title = clean_text(item.get("title", ""))
+    desc  = clean_text(item.get("description", ""))
+    full  = (title + " " + desc).upper()
+    return any(v.upper() in full for v in DAISO_VARIANTS)
+
+def build_naver_query(raw_keyword: str) -> str:
+    """
+    [FIX 1] 검색어에 '다이소'가 없으면 자동으로 앞에 붙여서
+    네이버 API에 전달되는 쿼리를 만든다.
+    예: '불량' → '다이소 불량'
+    """
+    kw = raw_keyword.strip()
+    has_daiso = any(v in kw for v in DAISO_VARIANTS)
+    if not has_daiso:
+        kw = "다이소 " + kw
+    return kw
 
 
 # ============================
@@ -621,7 +659,7 @@ def clean_text(text: str) -> str:
 
 
 # ============================
-# 품번·소분류 추출
+# [FIX 5] 품번 추출 — DB에 등록된 숫자 품번만 인정
 # ============================
 DATE_PATS = [
     r'\b20\d{6}\b', r'\b\d{4}[-./]\d{2}[-./]\d{2}\b',
@@ -634,8 +672,23 @@ def is_date_like(t):
     return bool(re.fullmatch(r'\d{6,8}', t.strip()))
 
 def extract_product_code(text):
-    raw   = re.findall(r'\b(?:[A-Za-z]{1,4}[-_]?\d{3,7}|\d{3,6}[-_][A-Za-z]{1,4}|NO\.?\s?\d{2,6})\b', text)
-    codes = [c for c in raw if not is_date_like(c)]
+    """
+    [FIX 5] 순수 숫자(3~6자리) 품번만 추출하고,
+    구글시트 DB에 실제로 등록된 품번만 반환한다.
+    영문+숫자 혼합 패턴은 제외.
+    """
+    # 순수 숫자 3~6자리만 추출
+    raw_nums = re.findall(r'\b(\d{3,6})\b', text)
+    codes = []
+    for c in raw_nums:
+        if is_date_like(c):
+            continue
+        # DB에 등록된 품번인지 확인
+        if VALID_PRODUCT_CODES and c in VALID_PRODUCT_CODES:
+            codes.append(c)
+        elif not VALID_PRODUCT_CODES:
+            # DB가 비어있으면 일단 모두 수집
+            codes.append(c)
     return ", ".join(dict.fromkeys(codes)) if codes else ""
 
 def extract_price(text):
@@ -667,7 +720,7 @@ def extract_subcategory(text):
 def match_product_name(code):
     if PRODUCT_DB.empty or not code: return ""
     for c in [c.strip() for c in code.split(",")]:
-        row = PRODUCT_DB[PRODUCT_DB["품번"].astype(str) == c]
+        row = PRODUCT_DB[PRODUCT_DB["품번"].astype(str).str.strip() == c]
         if not row.empty: return row.iloc[0]["품명"]
     return ""
 
@@ -707,14 +760,20 @@ SENT_BADGE = {"호평":"badge-pos","악평":"badge-neg","중립":"badge-neu"}
 def icon(label: str) -> str:
     return f'<span class="section-title-icon">{label}</span>'
 
+def fmt_score(score) -> str:
+    """[FIX 2] 확신도 정수%로 표기"""
+    try:
+        return f"{int(round(float(score)))}%"
+    except:
+        return f"{score}%"
+
 
 # ============================
-# 앱 헤더 (1번 수정: 다이소 로고 SVG 포함)
+# 앱 헤더
 # ============================
 st.markdown("""
 <div class="app-header">
     <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-        <!-- 다이소 로고: 파란 원 + DAISO 텍스트 워드마크 형태 -->
         <div style="
             width:48px; height:48px;
             background:#0066CC;
@@ -724,17 +783,11 @@ st.markdown("""
             box-shadow:0 2px 6px rgba(0,102,204,0.35);
         ">
             <svg width="30" height="20" viewBox="0 0 60 38" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- D -->
-                <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z
-                         M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
-                <!-- A -->
+                <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
                 <path d="M18 18 L24 2 L30 18 M20.5 12 H27.5" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
-                <!-- I -->
                 <rect x="33" y="2" width="3.5" height="16" rx="1" fill="#FFFFFF"/>
-                <!-- S -->
                 <path d="M40 15 Q40 18 44 18 Q48 18 48 14.5 Q48 11 44 10 Q40 9 40 5.5 Q40 2 44 2 Q48 2 48 5"
                       stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
-                <!-- O -->
                 <ellipse cx="54" cy="10" rx="5" ry="8" stroke="#FFFFFF" stroke-width="3" fill="none"/>
             </svg>
         </div>
@@ -748,7 +801,7 @@ st.markdown("""
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
         <div class="header-title">SNS-LENS · 불만 감성분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 다이소 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
+        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa 앙상블</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -758,7 +811,6 @@ st.markdown("""
 # 사이드바
 # ============================
 with st.sidebar:
-    # 로고 영역
     st.markdown("""
     <div style="display:flex;align-items:center;gap:0.6rem;padding-bottom:1rem;border-bottom:1px solid #E2E8F0;margin-bottom:0.25rem;">
         <div style="width:32px;height:32px;background:#0066CC;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,102,204,0.3);">
@@ -773,8 +825,8 @@ with st.sidebar:
 
     # ── ① 수집 채널 ──────────────────────────────────────
     st.markdown("""
-    <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
-        <div class="sb-section-icon" style="color:#FFFFFF;">
+    <div class="sb-section" style="margin:0.5rem 0 0.4rem;">
+        <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
             </svg>
@@ -783,63 +835,52 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 채널 선택: 2열 그리드 [체크박스+아이콘+라벨] ──
+    # [FIX 3] 채널 체크박스 — 체크박스+아이콘+텍스트를 한 행에 세로 가운데 정렬
+    # 2열 그리드로 배치
     col_left, col_right = st.columns(2)
 
-    # 블로그 (좌상)
     with col_left:
-        row1_cb, row1_l = st.columns([1, 5])
-        with row1_cb:
+        # 블로그
+        cb_col, icon_col = st.columns([1, 4])
+        with cb_col:
             search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
-        with row1_l:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
-                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">블로그</span>
+        with icon_col:
+            st.markdown("""<div class="ch-row">
+                <div class="ch-icon ch-naver">N</div>
+                <span class="ch-label">블로그</span>
             </div>""", unsafe_allow_html=True)
 
-    # 지식인 (우상)
-    with col_right:
-        row1_rcb, row1_r = st.columns([1, 5])
-        with row1_rcb:
-            search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
-        with row1_r:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
-                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">지식인</span>
-            </div>""", unsafe_allow_html=True)
-
-    # 카페 (좌하)
-    with col_left:
-        row2_cb, row2_l = st.columns([1, 5])
-        with row2_cb:
+        # 카페
+        cb_col2, icon_col2 = st.columns([1, 4])
+        with cb_col2:
             search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
-        with row2_l:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
-                <div style="width:18px;height:18px;background:#03C75A;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <span style="color:#FFFFFF;font-size:0.55rem;font-weight:900;">N</span>
-                </div>
-                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">카페</span>
+        with icon_col2:
+            st.markdown("""<div class="ch-row">
+                <div class="ch-icon ch-naver">N</div>
+                <span class="ch-label">카페</span>
             </div>""", unsafe_allow_html=True)
 
-    # 유튜브 (우하)
     with col_right:
-        row2_rcb, row2_r = st.columns([1, 5])
-        with row2_rcb:
+        # 지식인
+        cb_col3, icon_col3 = st.columns([1, 4])
+        with cb_col3:
+            search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
+        with icon_col3:
+            st.markdown("""<div class="ch-row">
+                <div class="ch-icon ch-naver">N</div>
+                <span class="ch-label">지식인</span>
+            </div>""", unsafe_allow_html=True)
+
+        # 유튜브
+        cb_col4, icon_col4 = st.columns([1, 4])
+        with cb_col4:
             search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
-        with row2_r:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:0.3rem;height:28px;margin-top:-2px;">
-                <div style="width:18px;height:18px;background:#FF0000;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        with icon_col4:
+            st.markdown("""<div class="ch-row">
+                <div class="ch-icon ch-youtube">
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
                 </div>
-                <span style="font-size:0.78rem;font-weight:500;color:#1A202C;">유튜브</span>
+                <span class="ch-label">유튜브</span>
             </div>""", unsafe_allow_html=True)
 
     # ── ② 검색어 ────────────────────────────────────────────
@@ -856,7 +897,8 @@ with st.sidebar:
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
                                   height=95, label_visibility="collapsed",
                                   placeholder="줄바꿈으로 구분 · 최대 10개")
-    st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개</span>', unsafe_allow_html=True)
+    # [FIX 1] 다이소 자동 추가 안내
+    st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개<br>※ \'다이소\' 없으면 자동 추가됩니다</span>', unsafe_allow_html=True)
 
     # ── ③ 수집 기간 ─────────────────────────────────────────
     st.markdown("""
@@ -913,11 +955,11 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     threshold = st.number_input(
-        "", min_value=40, max_value=95, value=60, step=5,
+        "", min_value=40, max_value=95, value=55, step=5,
         label_visibility="collapsed",
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 악평으로 등록"
     )
-    st.markdown('<span class="sb-hint">40~55% 민감 · 60~70% 권장 · 75%+ 엄격</span>', unsafe_allow_html=True)
+    st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     run_btn = st.button("분석 시작", use_container_width=True)
@@ -927,13 +969,16 @@ with st.sidebar:
 # 분석 실행
 # ============================
 if run_btn:
-    keywords = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:10]
-    if not keywords:
+    keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:10]
+    if not keywords_raw:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
     if not any([search_blog, search_kin, search_cafe, search_yt]):
         st.error("채널을 하나 이상 선택해주세요."); st.stop()
     if start_date > end_date:
         st.error("시작일이 종료일보다 늦습니다. 날짜를 확인해주세요."); st.stop()
+
+    # [FIX 1] 쿼리 빌드 — 다이소 자동 추가
+    keywords = [build_naver_query(k) for k in keywords_raw]
 
     with st.spinner("AI 앙상블 모델 초기화 중... (KR-ELECTRA + KLUE-RoBERTa)"):
         model_e = load_electra()
@@ -977,7 +1022,6 @@ if run_btn:
             if len(items) < per_page: break
         return all_items[:total]
 
-    # ── ★ 병렬 수집 (ThreadPoolExecutor) ──────────────────
     import concurrent.futures
 
     collect_tasks = []
@@ -991,7 +1035,6 @@ if run_btn:
     prog = st.progress(0)
     prog_text = st.empty()
     all_items = []; collect_log = []
-    lock_log = []
 
     def _fetch(task):
         tp, kw, label = task
@@ -1003,7 +1046,6 @@ if run_btn:
 
     total_tasks = len(collect_tasks)
     done = 0
-    # 최대 8개 스레드로 병렬 수집
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(_fetch, t): t for t in collect_tasks}
         for fut in concurrent.futures.as_completed(futures):
@@ -1021,6 +1063,11 @@ if run_btn:
         lnk = item.get("link","")
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
+    # [FIX 1] 다이소 관련 없는 결과 추가 필터링
+    before_rel = len(unique_items)
+    unique_items = [it for it in unique_items if is_daiso_related(it) or it.get("출처") == "카페"]
+    rel_excluded = before_rel - len(unique_items)
+
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
         "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
@@ -1037,11 +1084,16 @@ if run_btn:
     if not filtered:
         st.warning("해당 기간에 결과가 없습니다. 날짜 범위나 검색어를 확인해주세요."); st.stop()
 
-    usim_note = f" &nbsp;·&nbsp; 유심 관련 <strong>{usim_excluded}</strong>건 제외" if usim_excluded > 0 else ""
+    notes = []
+    if rel_excluded > 0:  notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
+    if usim_excluded > 0: notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
+    note_str = " &nbsp;·&nbsp; ".join(notes)
+    if note_str: note_str = " &nbsp;·&nbsp; " + note_str
+
     st.markdown(f"""
     <div class="card" style="border-left:3px solid #0066CC;">
         <span style="font-size:0.85rem;color:#0066CC;font-weight:600;">
-        ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후){usim_note}
+        ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후){note_str}
         </span><br>
         <span style="font-size:0.72rem;color:#718096;">{' &nbsp;|&nbsp; '.join(collect_log)}</span>
     </div>
@@ -1051,7 +1103,6 @@ if run_btn:
     progress_bar = st.progress(0)
     status_text  = st.empty()
 
-    # ── ★ 배치 AI 분석 (32개 단위) ────────────────────────
     BATCH = 32
     total_f = len(filtered)
 
@@ -1066,12 +1117,10 @@ if run_btn:
             texts.append(full)
             metas.append((src, item, title))
 
-        # 모델 배치 호출
         e_batch = model_e(texts, batch_size=BATCH, truncation=True, max_length=512) if model_e else [None]*len(texts)
         r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=512) if model_r else [None]*len(texts)
 
         for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
-            # 앙상블 (배치 결과 활용)
             votes = {"호평": 0.0, "악평": 0.0, "중립": 0.0}
             electra_neg_score = 0.0
             if e_batch[idx]:
@@ -1088,17 +1137,20 @@ if run_btn:
                         lbl = LABEL_MAP.get(it["label"])
                         if lbl: votes[lbl] += it["score"] * 1.0
                 except: pass
+
             rule_lbl, rule_sc = rule_based(full)
-            votes[rule_lbl] += rule_sc * 0.6
+            votes[rule_lbl] += rule_sc * 0.8  # [FIX 6] 룰베이스 가중치 상향
+
             total_v = sum(votes.values())
             if total_v == 0:
-                sentiment, score = "중립", 50.0
+                sentiment, score = "중립", 50
             else:
                 best  = max(votes, key=votes.get)
-                score = round(votes[best] / total_v * 100, 1)
+                score = round(votes[best] / total_v * 100)  # [FIX 2] 정수
                 neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
-                if best == "악평" and not (electra_neg_score >= 0.60 and neg_kw_cnt >= 2):
-                    best = "중립"; score = max(score * 0.7, 45.0)
+                # [FIX 6] 악평 억제 조건 완화
+                if best == "악평" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
+                    best = "중립"; score = max(round(score * 0.7), 45)
                 sentiment = best
 
             if score < threshold and sentiment != "중립":
@@ -1117,7 +1169,8 @@ if run_btn:
                 "품번":    prod_code, "품명": prod_name,
                 "가격언급":extract_price(full) if src != "유튜브" else "",
                 "title":  title, "link": item.get("link",""),
-                "날짜":   date_str, "감성": sentiment, "확신도": score,
+                "날짜":   date_str, "감성": sentiment,
+                "확신도": score,  # [FIX 2] 이미 정수
                 "channel":item.get("channel","") or item.get("cafename",""),
                 "views":  item.get("views",""), "likes": item.get("likes",""),
                 "comments":item.get("comments",""), "video_id":item.get("video_id",""),
@@ -1243,7 +1296,7 @@ if run_btn:
                         <span>📅 {r['날짜']}</span>
                         {'<span>🗂 ' + r['소분류'] + '</span>' if r.get('소분류') else ''}
                         {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
-                        <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
+                        <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
                     </div>
                 </div>""", unsafe_allow_html=True)
         else:
@@ -1317,7 +1370,7 @@ if run_btn:
                     {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
                     {'<span>🏷 ' + r['품명'] + '</span>' if r.get('품명') else ''}
                     {'<span>💰 ' + r['가격언급'] + '</span>' if r.get('가격언급') else ''}
-                    <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
+                    <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -1380,7 +1433,7 @@ if run_btn:
                         <span>▶ {views}</span>
                         <span>♥ {likes}</span>
                         <span>💬 {comments}</span>
-                        <span><span class="{b}">{r['감성']} {r['확신도']}%</span></span>
+                        <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
                     </div>
                 </div>""", unsafe_allow_html=True)
 
