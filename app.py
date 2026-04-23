@@ -873,21 +873,21 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     dc1, dc2 = st.columns(2)
-   with col1:
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:0.8rem;color:#4A5568;">시작일</span>
-    </div>
-    """, unsafe_allow_html=True)
-    start_date = st.date_input("", key="start_date")
+     with col1:
+        st.markdown("""
+            <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:0.8rem;color:#4A5568;">시작일</span>
+        </div>
+        """, unsafe_allow_html=True)
+        start_date = st.date_input("", key="start_date")
 
-    with col2:
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:6px;">
+     with col2:
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:6px;">
         <span style="font-size:0.8rem;color:#4A5568;">종료일</span>
-    </div>
-    """, unsafe_allow_html=True)
-    end_date = st.date_input("", key="end_date")
+        </div>
+        """, unsafe_allow_html=True)
+        end_date = st.date_input("", key="end_date")
 
     # ── ④ 수집 개수 (최대 5,000건으로 변경) ─────────────────
     st.markdown("""
