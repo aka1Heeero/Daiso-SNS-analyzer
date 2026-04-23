@@ -1296,7 +1296,7 @@ if run_btn:
                         <span>📅 {r['날짜']}</span>
                         {'<span>🗂 ' + r['소분류'] + '</span>' if r.get('소분류') else ''}
                         {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
-                        <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
+                        <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
         else:
@@ -1370,7 +1370,7 @@ if run_btn:
                     {'<span>🔢 ' + r['품번'] + '</span>' if r.get('품번') else ''}
                     {'<span>🏷 ' + r['품명'] + '</span>' if r.get('품명') else ''}
                     {'<span>💰 ' + r['가격언급'] + '</span>' if r.get('가격언급') else ''}
-                    <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
+                    <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -1433,7 +1433,7 @@ if run_btn:
                         <span>▶ {views}</span>
                         <span>♥ {likes}</span>
                         <span>💬 {comments}</span>
-                        <span><span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span></span>
+                        <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
 
