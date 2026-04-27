@@ -917,9 +917,9 @@ with st.sidebar:
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
-        run_btn = st.button("분석 시작", use_container_width=True)
+        run_btn = st.button("AI분석시작", use_container_width=True)
     with btn_col2:
-        stop_btn = st.button("분석 중지", use_container_width=True, key="stop_btn")
+        stop_btn = st.button("중지", use_container_width=True, key="stop_btn")
 
 
 # ============================
