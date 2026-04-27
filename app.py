@@ -235,6 +235,16 @@ html, body, .stApp {
     background: #F5C800 !important; box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important; color: #1A202C !important;
 }
 
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][key="stop_btn"] button,
+[data-testid="stSidebar"] div:has(> button[kind="secondary"]):last-child button {
+    background: #0066CC !important; color: #FFFFFF !important;
+    font-size: 1.05rem !important; font-weight: 800 !important;
+    box-shadow: 0 2px 8px rgba(0,102,204,0.35) !important;
+}
+[data-testid="stSidebar"] div:has(> button[kind="secondary"]):last-child button:hover {
+    background: #0052A3 !important; box-shadow: 0 4px 14px rgba(0,102,204,0.5) !important;
+}
+
 .stDownloadButton > button {
     background: var(--bg-white) !important; color: var(--primary) !important;
     border: 1.5px solid var(--primary) !important; border-radius: 8px !important;
@@ -605,19 +615,31 @@ def search_youtube(query: str, max_results: int = 30) -> list:
 # 날짜 파싱 & 필터
 # ============================
 def parse_date(item: dict):
+    """날짜 파싱: 블로그는 postdate, 지식인/카페는 날짜 필드가 없으므로 None 반환"""
     ds = item.get("postdate") or item.get("pubDate", "")
+    if not ds:
+        return None
     try:
         if len(ds) == 8: return datetime.strptime(ds, "%Y%m%d")
         return datetime.strptime(ds[:16], "%a, %d %b %Y")
     except: return None
 
 def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
+    """날짜 필터: 날짜 정보가 없는 항목(지식인/카페)은 날짜 필터를 통과시킴"""
     s = datetime(start_dt.year, start_dt.month, start_dt.day)
     e = datetime(end_dt.year,   end_dt.month,   end_dt.day, 23, 59, 59)
     result = []
     for item in items:
-        dt = item.get("pub_dt") if item.get("출처") == "유튜브" else parse_date(item)
-        if dt and s <= dt <= e: result.append(item)
+        src = item.get("출처", "")
+        if src == "유튜브":
+            dt = item.get("pub_dt")
+        else:
+            dt = parse_date(item)
+        # 날짜 정보가 있으면 범위 체크, 없으면(지식인/카페) 그냥 통과
+        if dt is None:
+            result.append(item)
+        elif s <= dt <= e:
+            result.append(item)
     return result
 
 
@@ -817,9 +839,9 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
-                                   height=95, label_visibility="collapsed",
-                                   placeholder="줄바꿈으로 구분 · 최대 10개")
-    st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개<br>※ \'다이소\' 없으면 자동 추가됩니다</span>', unsafe_allow_html=True)
+                                   height=80, label_visibility="collapsed",
+                                   placeholder="줄바꿈으로 구분 · 최대 3개 (OR 조건)")
+    st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 3개 (OR 조건)<br>※ \'다이소\' 없으면 자동 추가됩니다</span>', unsafe_allow_html=True)
 
     # ── ③ 수집 기간 ──
     st.markdown("""
@@ -837,7 +859,7 @@ with st.sidebar:
     dc1, dc2 = st.columns(2, gap="small")
     with dc1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
-        start_date = st.date_input("시작일", value=date(2025, 1, 1), label_visibility="collapsed", key="date_start")
+        start_date = st.date_input("시작일", value=date(2026, 1, 1), label_visibility="collapsed", key="date_start")
     with dc2:
         st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
         end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
@@ -856,10 +878,10 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    display_count = st.number_input("", min_value=10, max_value=5000, value=100, step=10,
+    display_count = st.number_input("", min_value=100, max_value=5000, value=100, step=100,
                                      label_visibility="collapsed",
-                                     help="데이터 수집건수 (최소 10 ~ 최대 5,000)")
-    st.markdown('<span class="sb-hint">데이터 수집건수 · 10 ~ 5,000</span>', unsafe_allow_html=True)
+                                     help="데이터 수집건수 (최소 100 ~ 최대 5,000, ±100)")
+    st.markdown('<span class="sb-hint">데이터 수집건수 · 100 ~ 5,000 (±100)</span>', unsafe_allow_html=True)
 
     # ── ⑤ 부정 확신도 ──
     st.markdown("""
@@ -893,16 +915,31 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
-    run_btn = st.button("분석 시작", use_container_width=True)
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        run_btn = st.button("분석 시작", use_container_width=True)
+    with btn_col2:
+        stop_btn = st.button("분석 중지", use_container_width=True, key="stop_btn")
 
+
+# ============================
+# 분석 중지 처리
+# ============================
+if stop_btn:
+    st.session_state["analysis_stopped"] = True
+    st.warning("⏹ 분석이 중지되었습니다.")
+    st.stop()
 
 # ============================
 # 분석 실행
 # ============================
 if run_btn:
-    keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:10]
+    st.session_state["analysis_stopped"] = False
+    keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:3]
     if not keywords_raw:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
+    if len(keywords_raw) > 3:
+        st.error("검색어는 최대 3개까지 입력 가능합니다."); st.stop()
     if not any([search_blog, search_kin, search_cafe, search_yt]):
         st.error("채널을 하나 이상 선택해주세요."); st.stop()
     if start_date > end_date:
@@ -955,9 +992,11 @@ if run_btn:
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
     # ── 다이소 관련성 필터 ──
+    # 카페/지식인은 검색어에 이미 "다이소"가 포함되어 있고,
+    # API 응답의 description이 짧아서 "다이소"가 잘릴 수 있으므로 필터 제외
     before_rel = len(unique_items)
     unique_items = [it for it in unique_items
-                    if it.get("출처") == "카페" or is_daiso_related(it)]
+                    if it.get("출처") in ("카페", "지식인") or is_daiso_related(it)]
     rel_excluded = before_rel - len(unique_items)
 
     # ── [FIX 1] 홍보성 글 제외 ──
@@ -1108,65 +1147,79 @@ if run_btn:
                 if c: all_codes.append(f"{c} {r.get('품명','') }".strip())
     code_cnt = Counter(all_codes)
 
-    date_neg = {}
+    date_sent = {}
     for r in results:
-        if r["감성"] == "부정" and r.get("날짜"):
-            month = r["날짜"][:7]
-            date_neg[month] = date_neg.get(month, 0) + 1
+        if r.get("날짜"):
+            d = r["날짜"][:10]
+            date_sent.setdefault(d, {"긍정":0,"부정":0,"중립":0})
+            date_sent[d][r["감성"]] += 1
 
     with tab_dash:
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
 
+        # ── 감성 필터 버튼 (긍정/부정 클릭 시 아래 내용 필터링) ──
+        if "dash_filter" not in st.session_state:
+            st.session_state["dash_filter"] = "전체"
+
         c1, c2, c3, c4 = st.columns(4)
-        for col, cls, lbl, val, pct, ic_txt in [
-            (c1,"total","전체 수집",  str(total), "100%",                                    "전체"),
-            (c2,"pos",  "긍정",      str(pos),   f"{round(pos/total*100) if total else 0}%","긍정"),
-            (c3,"neg",  "부정",      str(neg),   f"{round(neg/total*100) if total else 0}%","부정"),
-            (c4,"neu",  "중립",      str(neu),   f"{round(neu/total*100) if total else 0}%","중립"),
-        ]:
-            with col:
-                st.markdown(f"""
-                <div class="metric-card {cls}">
-                    <div class="metric-label"><span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}</div>
-                    <div class="metric-value">{val}</div>
-                    <div class="metric-pct">{pct}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        with c1:
+            if st.button(f"전체 {total}", key="dash_total", use_container_width=True):
+                st.session_state["dash_filter"] = "전체"
+        with c2:
+            if st.button(f"긍정 {pos} ({round(pos/total*100) if total else 0}%)", key="dash_pos", use_container_width=True):
+                st.session_state["dash_filter"] = "긍정"
+        with c3:
+            if st.button(f"부정 {neg} ({round(neg/total*100) if total else 0}%)", key="dash_neg", use_container_width=True):
+                st.session_state["dash_filter"] = "부정"
+        with c4:
+            if st.button(f"중립 {neu} ({round(neu/total*100) if total else 0}%)", key="dash_neu", use_container_width=True):
+                st.session_state["dash_filter"] = "중립"
 
-        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+        dash_filter = st.session_state["dash_filter"]
+        filtered_results = results if dash_filter == "전체" else [r for r in results if r["감성"] == dash_filter]
 
-        d1, d2, d3 = st.columns(3)
-        sub_u  = len(sub_cnt)
-        code_u = len(set(r["품번"] for r in results if r.get("품번")))
-        name_u = len(set(r["품명"] for r in results if r.get("품명")))
-        for col, lbl, val in [(d1,"소분류 수",str(sub_u)),(d2,"품번 수",str(code_u)),(d3,"품명 수",str(name_u))]:
-            with col:
-                st.markdown(f"""
-                <div class="card" style="text-align:center;padding:1rem 0.75rem;">
-                    <div style="font-size:1.6rem;font-weight:700;color:#0066CC;font-family:'Inter',sans-serif;">{val}</div>
-                    <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:0.78rem;color:#718096;margin:0.5rem 0;">현재 필터: <strong style="color:#0066CC;">{dash_filter}</strong> ({len(filtered_results)}건)</div>', unsafe_allow_html=True)
 
-        if date_neg:
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 부정 건수</span></div>', unsafe_allow_html=True)
-            chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","부정수"]).sort_values("월")
+        # ── 일자별 꺾은선 그래프 (긍정/부정 범례) ──
+        if date_sent:
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("📈")} <span style="font-size:0.95rem;font-weight:600;">일자별 감성 추이</span></div>', unsafe_allow_html=True)
+            chart_rows = []
+            for d, counts in date_sent.items():
+                chart_rows.append({"날짜": d, "감성": "긍정", "건수": counts["긍정"]})
+                chart_rows.append({"날짜": d, "감성": "부정", "건수": counts["부정"]})
+            chart_df = pd.DataFrame(chart_rows).sort_values("날짜")
+            color_scale = alt.Scale(domain=["긍정","부정"], range=["#16A34A","#DC2626"])
             chart = (alt.Chart(chart_df)
-                .mark_bar(color="#0066CC", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+                .mark_line(point=True, strokeWidth=2)
                 .encode(
-                    x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0, labelFontSize=12)),
-                    y=alt.Y("부정수:Q", axis=alt.Axis(title="부정 건수", titleFontSize=11)),
-                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("부정수:Q", title="건수")]
-                ).properties(height=220)
+                    x=alt.X("날짜:O", axis=alt.Axis(title="", labelAngle=-45, labelFontSize=10)),
+                    y=alt.Y("건수:Q", axis=alt.Axis(title="건수", titleFontSize=11)),
+                    color=alt.Color("감성:N", scale=color_scale, legend=alt.Legend(title="감성")),
+                    tooltip=[alt.Tooltip("날짜:O"), alt.Tooltip("감성:N"), alt.Tooltip("건수:Q")]
+                ).properties(height=250)
                 .configure_view(strokeWidth=0)
-                .configure_axis(grid=False, domain=False))
+                .configure_axis(grid=True, gridColor="#F0F0F0", domain=False))
             st.altair_chart(chart, use_container_width=True)
+
+        # ── 소분류 / 품번 TOP 10 (필터 적용) ──
+        filt_subs = []
+        for r in filtered_results:
+            if r.get("소분류"): filt_subs.extend([s.strip() for s in r["소분류"].split(",") if s.strip()])
+        filt_sub_cnt = Counter(filt_subs)
+
+        filt_codes = []
+        for r in filtered_results:
+            if r.get("품번"):
+                for c in r["품번"].split(","):
+                    c = c.strip()
+                    if c: filt_codes.append(f"{c} {r.get('품명','') }".strip())
+        filt_code_cnt = Counter(filt_codes)
 
         col_top1, col_top2 = st.columns(2)
         with col_top1:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("분류")} <span style="font-size:0.95rem;font-weight:600;">소분류 TOP 10</span></div>', unsafe_allow_html=True)
             html = ""
-            for rank, (name, count) in enumerate(sub_cnt.most_common(10), 1):
+            for rank, (name, count) in enumerate(filt_sub_cnt.most_common(10), 1):
                 cls = "r1" if rank == 1 else ""
                 html += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html or "<span style=\'color:#718096;font-size:0.82rem;\'>소분류 데이터 없음</span>"}</div>', unsafe_allow_html=True)
@@ -1174,26 +1227,51 @@ if run_btn:
         with col_top2:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("품번")} <span style="font-size:0.95rem;font-weight:600;">주요 품번+품명 TOP 10</span></div>', unsafe_allow_html=True)
             html2 = ""
-            for rank, (name, count) in enumerate(code_cnt.most_common(10), 1):
+            for rank, (name, count) in enumerate(filt_code_cnt.most_common(10), 1):
                 cls = "r1" if rank == 1 else ""
                 html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
+        # ── 원문 목록 + AI 요약 + 관리자 제외 기능 ──
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("📋")} <span style="font-size:0.95rem;font-weight:600;">{dash_filter} 글 목록 (원문 + AI 요약)</span></div>', unsafe_allow_html=True)
 
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("부정")} <span style="font-size:0.95rem;font-weight:600;">주요 부정 글 목록</span></div>', unsafe_allow_html=True)
-        neg_results = [r for r in results if r["감성"] == "부정"]
-        if neg_results:
-            for r in neg_results[:20]:
-                _b    = SENT_BADGE.get(r["감성"], "")
-                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
-                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+        if "excluded_items" not in st.session_state:
+            st.session_state["excluded_items"] = {}
+
+        if filtered_results:
+            for idx, r in enumerate(filtered_results[:30]):
+                item_key = r.get("link", str(idx))
+                if item_key in st.session_state["excluded_items"]:
+                    continue
+
+                _b     = SENT_BADGE.get(r["감성"], "")
+                _sub   = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code  = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
                 _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
                 _title = r["title"] or "(제목 없음)"
-                _html  = (
+
+                # AI 요약 생성 (간단한 룰 기반 요약)
+                summary = ""
+                title_clean = clean_text(r.get("title",""))
+                neg_found = [kw for kw in NEGATIVE_KW if kw in title_clean]
+                pos_found = [kw for kw in POSITIVE_KW if kw in title_clean]
+                if r["감성"] == "부정" and neg_found:
+                    summary = f"부정 키워드: {', '.join(neg_found[:3])} — 상품 품질/사용성 불만 가능성"
+                elif r["감성"] == "긍정" and pos_found:
+                    summary = f"긍정 키워드: {', '.join(pos_found[:3])} — 고객 만족 요인"
+                elif r["감성"] == "부정":
+                    summary = "AI 모델이 부정으로 판단 — 상세 내용 확인 필요"
+                elif r["감성"] == "긍정":
+                    summary = "AI 모델이 긍정으로 판단 — 강점 요인 확인"
+                else:
+                    summary = "중립적 언급 — 특별한 감성 경향 없음"
+
+                _html = (
                     '<div class="result-card">'
                     '<div class="result-title">'
                     '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
                     '</div>'
+                    '<div style="font-size:0.75rem;color:#4A5568;background:#F8F9FB;padding:0.4rem 0.6rem;border-radius:6px;margin:0.3rem 0;">💡 ' + summary + '</div>'
                     '<div class="result-meta">'
                     '<span>📍 ' + r["출처"] + '</span>'
                     '<span>🔍 ' + r["검색어"] + '</span>'
@@ -1202,8 +1280,31 @@ if run_btn:
                     '</div>'
                     '</div>')
                 st.markdown(_html, unsafe_allow_html=True)
+
+                # 관리자 제외 기능
+                with st.expander(f"⚙ 이 글 제외하기 (#{idx+1})", expanded=False):
+                    reason = st.text_input("제외 사유", key=f"exclude_reason_{idx}", placeholder="예: 다이소와 무관한 글")
+                    if st.button("제외 확정", key=f"exclude_btn_{idx}"):
+                        if reason.strip():
+                            st.session_state["excluded_items"][item_key] = reason.strip()
+                            # 룰베이스 키워드에 추가 (학습)
+                            new_kw = reason.strip()
+                            if new_kw and new_kw not in PROMO_KW:
+                                PROMO_KW.append(new_kw)
+                            st.success(f"✅ 제외 완료. 사유: {reason}")
+                            st.rerun()
+                        else:
+                            st.warning("제외 사유를 입력해주세요.")
         else:
-            st.info("부정으로 분류된 글이 없습니다.")
+            st.info(f"{dash_filter}으로 분류된 글이 없습니다.")
+
+        # ── 제외된 항목 관리 ──
+        if st.session_state.get("excluded_items"):
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("🚫")} <span style="font-size:0.95rem;font-weight:600;">제외된 항목 ({len(st.session_state["excluded_items"])}건)</span></div>', unsafe_allow_html=True)
+            st.markdown('<div class="card" style="font-size:0.8rem;">', unsafe_allow_html=True)
+            for link, reason in st.session_state["excluded_items"].items():
+                st.markdown(f'<div style="padding:0.3rem 0;border-bottom:1px solid #E2E8F0;">🔗 {link[:60]}... → 사유: <strong>{reason}</strong></div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("↓")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span></div>', unsafe_allow_html=True)
         dl1, dl2 = st.columns(2)
