@@ -6,6 +6,7 @@ import io
 import gspread
 import pandas as pd
 import altair as alt
+import concurrent.futures
 from datetime import datetime, date
 from google.oauth2.service_account import Credentials
 from transformers import pipeline
@@ -55,12 +56,12 @@ html, body, .stApp {
     font-family: 'Noto Sans KR', sans-serif !important;
 }
 
-/* ── 사이드바 ── */
 [data-testid="stSidebar"] {
     background: var(--bg-white) !important;
     border-right: 1px solid var(--border) !important;
 }
 [data-testid="stSidebar"] * { color: var(--text) !important; }
+
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] .stTextArea textarea,
 [data-testid="stSidebar"] .stNumberInput input {
@@ -79,7 +80,6 @@ html, body, .stApp {
     outline: none !important;
 }
 
-/* ── [FIX 4] 날짜 입력 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
@@ -93,215 +93,128 @@ html, body, .stApp {
     box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    margin-top: 0 !important; margin-bottom: 0 !important;
+    padding-top: 0 !important; padding-bottom: 0 !important;
 }
-[data-testid="stSidebar"] [data-testid="stDateInput"] > label {
-    display: none !important;
-}
-/* [FIX 4] date-label 간격 최소화 */
-.date-label {
-    font-size: 0.7rem;
-    color: #718096;
-    margin-bottom: 1px;
-    margin-top: 0;
-    display: block;
-    line-height: 1.1;
-}
-/* [FIX 4] date 컬럼 내부 gap 줄이기 */
+[data-testid="stSidebar"] [data-testid="stDateInput"] > label { display: none !important; }
+
+.date-label { font-size: 0.7rem; color: #718096; margin-bottom: 1px; margin-top: 0; display: block; line-height: 1.1; }
+
 [data-testid="stSidebar"] [data-testid="column"] {
-    gap: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    gap: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important;
 }
 
-/* ── 헤더 ── */
 .app-header {
-    background: var(--bg-white);
-    border-bottom: 1px solid var(--border);
-    padding: 1.25rem 2rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    border-radius: 12px;
-    box-shadow: var(--shadow);
+    background: var(--bg-white); border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem; display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 1.5rem; border-radius: 12px; box-shadow: var(--shadow);
 }
 .header-icon {
-    width: 40px; height: 40px;
-    background: var(--primary);
-    border-radius: 10px;
+    width: 40px; height: 40px; background: var(--primary); border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.1rem; color: #FFFFFF !important; flex-shrink: 0;
 }
-.header-title {
-    font-size: 1.25rem; font-weight: 700;
-    color: var(--text); letter-spacing: -0.01em;
-}
-.header-sub {
-    font-size: 0.78rem; color: var(--text3);
-    margin-top: 0.1rem;
-}
+.header-title { font-size: 1.25rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.header-sub { font-size: 0.78rem; color: var(--text3); margin-top: 0.1rem; }
 
-/* ── 카드 ── */
 .card {
-    background: var(--bg-white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    box-shadow: var(--shadow);
-    margin-bottom: 1rem;
+    background: var(--bg-white); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1rem;
 }
 
-/* ── 메트릭 카드 ── */
 .metric-card {
-    flex: 1; background: var(--bg-white);
-    border: 1px solid var(--border); border-radius: 12px;
-    padding: 1.25rem 1.5rem; box-shadow: var(--shadow);
+    flex: 1; background: var(--bg-white); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow);
     border-top: 3px solid transparent;
 }
 .metric-card.total { border-top-color: var(--primary); }
 .metric-card.pos   { border-top-color: var(--pos); }
 .metric-card.neg   { border-top-color: var(--neg); }
 .metric-card.neu   { border-top-color: var(--neu); }
+
 .metric-label {
     font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.5rem;
     display: flex; align-items: center; gap: 0.5rem;
 }
 .metric-icon {
-    width: 22px; height: 22px;
-    background: var(--primary);
-    border-radius: 6px;
+    width: 22px; height: 22px; background: var(--primary); border-radius: 6px;
     display: inline-flex; align-items: center; justify-content: center;
-    color: #FFFFFF !important;
-    font-size: 0.68rem; font-weight: 700;
+    color: #FFFFFF !important; font-size: 0.68rem; font-weight: 700;
     flex-shrink: 0; line-height: 1;
 }
-.metric-icon.pos { background: var(--pos);  color: #FFFFFF !important; }
-.metric-icon.neg { background: var(--neg);  color: #FFFFFF !important; }
-.metric-icon.neu { background: var(--neu);  color: #FFFFFF !important; }
-.metric-value {
-    font-family: 'Inter', sans-serif; font-size: 2.2rem;
-    font-weight: 600; color: var(--text); line-height: 1;
-}
+.metric-icon.pos { background: var(--pos); color: #FFFFFF !important; }
+.metric-icon.neg { background: var(--neg); color: #FFFFFF !important; }
+.metric-icon.neu { background: var(--neu); color: #FFFFFF !important; }
+.metric-value { font-family: 'Inter', sans-serif; font-size: 2.2rem; font-weight: 600; color: var(--text); line-height: 1; }
 .metric-pct { font-size: 0.78rem; color: var(--text3); margin-top: 0.3rem; }
 
-/* ── 섹션 타이틀 아이콘 ── */
 .section-title-icon {
-    width: 24px; height: 24px;
-    background: var(--primary);
-    border-radius: 6px;
+    width: 24px; height: 24px; background: var(--primary); border-radius: 6px;
     display: inline-flex; align-items: center; justify-content: center;
-    color: #FFFFFF !important;
-    font-size: 0.75rem; font-weight: 700;
+    color: #FFFFFF !important; font-size: 0.75rem; font-weight: 700;
     flex-shrink: 0; vertical-align: middle;
 }
 
-/* ── 감성 뱃지 ── */
 .badge-pos { background: var(--pos-bg); color: var(--pos); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neg { background: var(--neg-bg); color: var(--neg); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neu { background: var(--neu-bg); color: var(--neu); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 
-/* ── TOP 아이템 ── */
-.top-item {
-    display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.6rem 0; border-bottom: 1px solid var(--border);
-}
+.top-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
 .top-item:last-child { border-bottom: none; }
 .top-rank {
-    width: 26px; height: 26px; background: var(--primary-lt);
-    border-radius: 6px; display: flex; align-items: center;
-    justify-content: center; font-size: 0.72rem; font-weight: 700;
-    color: var(--primary); flex-shrink: 0;
+    width: 26px; height: 26px; background: var(--primary-lt); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; color: var(--primary); flex-shrink: 0;
 }
 .top-rank.r1 { background: var(--primary); color: #FFFFFF !important; }
 .top-name { flex: 1; font-size: 0.85rem; color: var(--text); }
-.top-count {
-    font-size: 0.78rem; font-weight: 600; color: var(--primary);
-    background: var(--primary-lt); padding: 2px 8px; border-radius: 20px;
-}
+.top-count { font-size: 0.78rem; font-weight: 600; color: var(--primary); background: var(--primary-lt); padding: 2px 8px; border-radius: 20px; }
 
-/* ── 결과 카드 ── */
 .result-card {
-    background: var(--bg-white); border: 1px solid var(--border);
-    border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.5rem;
-    box-shadow: var(--shadow); transition: box-shadow 0.2s;
+    background: var(--bg-white); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem 1.25rem; margin-bottom: 0.5rem; box-shadow: var(--shadow); transition: box-shadow 0.2s;
 }
 .result-card:hover { box-shadow: var(--shadow-md); }
 .result-title { font-size: 0.9rem; font-weight: 500; color: var(--text); margin-bottom: 0.4rem; }
 .result-meta { font-size: 0.75rem; color: var(--text3); display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .result-meta span { display: flex; align-items: center; gap: 0.2rem; }
 
-/* ── 로그인 ── */
 .login-wrap {
-    max-width: 380px; margin: 5rem auto;
-    background: var(--bg-white); border: 1px solid var(--border);
-    border-radius: 16px; padding: 2.5rem 2rem; text-align: center;
-    box-shadow: var(--shadow-md);
+    max-width: 380px; margin: 5rem auto; background: var(--bg-white);
+    border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem 2rem;
+    text-align: center; box-shadow: var(--shadow-md);
 }
 .login-icon {
-    width: 52px; height: 52px; background: var(--primary);
-    border-radius: 14px; margin: 0 auto 1rem;
-    display: flex; align-items: center; justify-content: center;
+    width: 52px; height: 52px; background: var(--primary); border-radius: 14px;
+    margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center;
     font-size: 1.4rem; color: #FFFFFF !important;
 }
 .login-title { font-size: 1.3rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
 .login-sub { font-size: 0.82rem; color: var(--text3); margin-bottom: 1.5rem; }
 
-/* ── 사이드바 섹션 헤더 ── */
 .sb-section {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.55rem 0.7rem;
-    background: var(--primary-lt);
-    border-left: 3px solid var(--primary);
-    border-radius: 0 6px 6px 0;
-    margin: 1rem 0 0.5rem;
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.7rem;
+    background: var(--primary-lt); border-left: 3px solid var(--primary);
+    border-radius: 0 6px 6px 0; margin: 1rem 0 0.5rem;
 }
 .sb-section-icon {
-    width: 20px; height: 20px;
-    background: var(--primary);
-    border-radius: 5px;
+    width: 20px; height: 20px; background: var(--primary); border-radius: 5px;
     display: inline-flex; align-items: center; justify-content: center;
-    color: #FFFFFF !important;
-    font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
+    color: #FFFFFF !important; font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
 }
-.sb-section-text {
-    font-size: 0.72rem; font-weight: 700;
-    color: var(--primary) !important;
-    text-transform: uppercase; letter-spacing: 0.07em;
-}
+.sb-section-text { font-size: 0.72rem; font-weight: 700; color: var(--primary) !important; text-transform: uppercase; letter-spacing: 0.07em; }
 .sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; display: block; line-height: 1.5; }
 
-/* ── 채널 체크박스 ── */
-.ch-row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0;
-    min-height: 32px;
-}
-.ch-icon {
-    width: 20px; height: 20px; border-radius: 4px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.55rem; color: #FFFFFF !important;
-    font-weight: 900; flex-shrink: 0;
-}
+.ch-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0; min-height: 32px; }
+.ch-icon { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #FFFFFF !important; font-weight: 900; flex-shrink: 0; }
 .ch-naver   { background: #03C75A; }
 .ch-youtube { background: #FF0000; }
-.ch-label   {
-    font-size: 0.82rem; font-weight: 500;
-    color: var(--text) !important;
-    line-height: 1;
-}
+.ch-label   { font-size: 0.82rem; font-weight: 500; color: var(--text) !important; line-height: 1; }
 
-/* ── 숫자 입력 ── */
 [data-testid="stNumberInput"] > div { border-radius: 8px !important; }
 [data-testid="stNumberInput"] button { color: var(--primary) !important; }
 
-/* ── 버튼 기본 ── */
 .stButton > button {
     background: var(--primary) !important; color: #FFFFFF !important;
     border: none !important; border-radius: 8px !important;
@@ -310,56 +223,36 @@ html, body, .stApp {
     padding: 0.6rem 1.25rem !important; transition: all 0.2s !important;
     letter-spacing: 0.01em !important;
 }
-.stButton > button:hover {
-    background: #0052A3 !important;
-    box-shadow: 0 4px 12px rgba(0,102,204,0.3) !important;
-}
+.stButton > button:hover { background: #0052A3 !important; box-shadow: 0 4px 12px rgba(0,102,204,0.3) !important; }
 
-/* ── 분석 시작 버튼 — 노란색 ── */
 [data-testid="stSidebar"] .stButton > button {
-    background: #FFD600 !important;
-    color: #1A202C !important;
-    font-size: 1.05rem !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.03em !important;
-    border: none !important;
+    background: #FFD600 !important; color: #1A202C !important;
+    font-size: 1.05rem !important; font-weight: 800 !important;
+    letter-spacing: 0.03em !important; border: none !important;
     box-shadow: 0 2px 8px rgba(255,214,0,0.35) !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-    background: #F5C800 !important;
-    box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important;
-    color: #1A202C !important;
+    background: #F5C800 !important; box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important; color: #1A202C !important;
 }
 
 .stDownloadButton > button {
     background: var(--bg-white) !important; color: var(--primary) !important;
     border: 1.5px solid var(--primary) !important; border-radius: 8px !important;
     font-family: 'Noto Sans KR', sans-serif !important;
-    font-size: 0.875rem !important; font-weight: 500 !important;
-    width: 100% !important;
+    font-size: 0.875rem !important; font-weight: 500 !important; width: 100% !important;
 }
 .stDownloadButton > button:hover { background: var(--primary-lt) !important; }
 
-/* ── 탭 ── */
-.stTabs [data-baseweb="tab-list"] {
-    background: transparent !important;
-    border-bottom: 2px solid var(--border) !important; gap: 0 !important;
-}
+.stTabs [data-baseweb="tab-list"] { background: transparent !important; border-bottom: 2px solid var(--border) !important; gap: 0 !important; }
 .stTabs [data-baseweb="tab"] {
-    font-family: 'Noto Sans KR', sans-serif !important;
-    font-size: 0.85rem !important; font-weight: 500 !important;
-    color: var(--text3) !important; background: transparent !important;
+    font-family: 'Noto Sans KR', sans-serif !important; font-size: 0.85rem !important;
+    font-weight: 500 !important; color: var(--text3) !important; background: transparent !important;
     border: none !important; border-bottom: 2px solid transparent !important;
-    padding: 0.6rem 1.2rem !important; border-radius: 0 !important;
-    margin-bottom: -2px !important;
+    padding: 0.6rem 1.2rem !important; border-radius: 0 !important; margin-bottom: -2px !important;
 }
-.stTabs [aria-selected="true"] {
-    color: var(--primary) !important;
-    border-bottom-color: var(--primary) !important;
-}
+.stTabs [aria-selected="true"] { color: var(--primary) !important; border-bottom-color: var(--primary) !important; }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 1.25rem !important; }
 
-/* ── 기타 ── */
 .stProgress > div > div > div > div { background: var(--primary) !important; border-radius: 4px !important; }
 .stProgress > div > div > div { background: var(--border) !important; border-radius: 4px !important; height: 6px !important; }
 .stDataFrame { border-radius: 10px !important; overflow: hidden !important; }
@@ -369,43 +262,22 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
 
 .badge-coming {
     display: inline-flex; align-items: center; gap: 0.3rem;
-    background: #F1F5F9; color: #64748B;
-    border: 1px dashed #CBD5E1;
-    padding: 0.35rem 0.75rem; border-radius: 6px;
-    font-size: 0.78rem; font-weight: 500;
+    background: #F1F5F9; color: #64748B; border: 1px dashed #CBD5E1;
+    padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
 }
 
-/* 체크박스 세로 정렬 */
 [data-testid="stSidebar"] .stCheckbox {
-    display: flex !important;
-    align-items: center !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: unset !important;
+    display: flex !important; align-items: center !important; margin: 0 !important; padding: 0 !important; min-height: unset !important;
 }
-[data-testid="stSidebar"] .stCheckbox label {
-    padding: 0 !important;
-    min-height: unset !important;
-    gap: 0 !important;
-}
+[data-testid="stSidebar"] .stCheckbox label { padding: 0 !important; min-height: unset !important; gap: 0 !important; }
 
-/* ── [FIX 3] 감성 파라미터 안내 박스 ── */
 .param-guide-box {
-    background: #F0F7FF;
-    border: 1.5px solid #B3D1F5;
-    border-radius: 10px;
-    padding: 0.9rem 1rem;
-    margin: 0.5rem 0 1rem;
-    font-size: 0.78rem;
-    color: #1A202C;
-    line-height: 1.7;
+    background: #F0F7FF; border: 1.5px solid #B3D1F5; border-radius: 10px;
+    padding: 0.9rem 1rem; margin: 0.5rem 0 1rem; font-size: 0.78rem;
+    color: #1A202C; line-height: 1.7;
 }
 .param-guide-box b { color: #0066CC; }
-.param-guide-box code {
-    background: #E8F1FB; color: #0052A3;
-    border-radius: 4px; padding: 1px 5px;
-    font-size: 0.74rem; font-family: monospace;
-}
+.param-guide-box code { background: #E8F1FB; color: #0052A3; border-radius: 4px; padding: 1px 5px; font-size: 0.74rem; font-family: monospace; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -440,7 +312,6 @@ NAVER_CLIENT_ID     = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
 
-
 # ============================================== 구글시트 불러오기 (품번,품명,소분류)
 @st.cache_data(ttl=3600)
 def load_product_db():
@@ -461,7 +332,6 @@ def load_product_db():
         return pd.DataFrame(columns=["품번", "품명", "소분류"])
 
 PRODUCT_DB = load_product_db()
-
 VALID_PRODUCT_CODES = set()
 if not PRODUCT_DB.empty and "품번" in PRODUCT_DB.columns:
     VALID_PRODUCT_CODES = set(PRODUCT_DB["품번"].dropna().astype(str).str.strip().tolist())
@@ -473,13 +343,16 @@ def load_subcategories():
 
 SUBCATEGORIES = load_subcategories()
 
-
 # ============================================== AI모델링 (앙상블)
+# [개선] tabularisai: 5단계 감성분석, 23개 언어 지원, 2025년 8월 최신 업데이트
+# [유지] Chamsol/klue-roberta: 한국어 전용 감성분석
+# [제거] snunlp/KR-ELECTRA-discriminator: 감성분석 모델이 아닌 discriminator였으므로 제거
+
 @st.cache_resource
-def load_electra():
+def load_multilingual():
     try:
-        return pipeline("text-classification", model="snunlp/KR-ELECTRA-discriminator",
-                        truncation=True, max_length=512, top_k=None, device=-1)
+        return pipeline("text-classification", model="tabularisai/multilingual-sentiment-analysis",
+                         truncation=True, max_length=512, top_k=None, device=-1)
     except Exception:
         return None
 
@@ -487,9 +360,18 @@ def load_electra():
 def load_roberta():
     try:
         return pipeline("text-classification", model="Chamsol/klue-roberta-sentiment-classification",
-                        truncation=True, max_length=512, top_k=None, device=-1)
+                         truncation=True, max_length=512, top_k=None, device=-1)
     except Exception:
         return None
+
+
+# ============================
+# 텍스트 전처리 (다른 함수들이 의존하므로 먼저 정의)
+# ============================
+def clean_text(text: str) -> str:
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'&[#\w]+;', ' ', text)  # &#39; &#x27; &amp; 등 모두 처리
+    return text.strip()
 
 
 # ============================
@@ -499,15 +381,17 @@ NEGATIVE_KW = [
     "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
     "쓰레기","구려","나빠","고장","터졌","망가","깨졌","불편","아쉬워","위험",
     "조심","주의","문제","하자","뜯겨","냄새","오염","불결","지저분","더럽",
-    "싸구려","허접","대충","클레임","AS","환급","반품","재구매 안","비추","별점 1",
-    "별점1","1점","속았","낚였","사기","뻥","가짜","품질 나쁜","품질이 나쁜",
-    "뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠","못써","쓸모없어",
-    "수량적음","색이다름","색상상이","성능과장","원산지 불명확","색감차이",
-    "과포장","과점착","색번짐","이염","후회","별로야","별로네","글쎄","그냥저냥",
-    "생각보다 별로","기대 이하","실패","구매실패","돈낭비","돈 낭비","비싸","불합리",
-    "사지마","사지 마","추천안","추천 안","별1","1개","뒤틀","휘어","금방망가",
-    "금방 망가","오래못가","오래 못가","금방부서","금방 부서",
+    "싸구려","허접","대충","클레임","AS","환급","반품","재구매 안","비추",
+    "별점 1","별점1","1점","속았","낚였","사기","뻥","가짜","품질 나쁜",
+    "품질이 나쁜","뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠",
+    "못써","쓸모없어","수량적음","색이다름","색상상이","성능과장","원산지 불명확",
+    "색감차이","과포장","과점착","색번짐","이염","후회","별로야","별로네",
+    "글쎄","그냥저냥","생각보다 별로","기대 이하","실패","구매실패","돈낭비",
+    "돈 낭비","비싸","불합리","사지마","사지 마","추천안","추천 안","별1",
+    "1개","뒤틀","휘어","금방망가","금방 망가","오래못가","오래 못가",
+    "금방부서","금방 부서",
 ]
+
 POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
     "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱",
@@ -527,33 +411,51 @@ PROMO_KW = [
     "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천",
 ]
 
+
 # ============================
 # [FIX 1] 홍보성 글 판단 함수
 # ============================
 def is_promotional(item: dict) -> bool:
-    """
-    제목+본문에 홍보성 키워드가 포함되어 있고,
-    부정 키워드가 1개도 없으면 홍보성 글로 판단해 제외.
-    """
+    """제목+본문에 홍보성 키워드가 포함되어 있고,
+    부정 키워드가 1개도 없으면 홍보성 글로 판단해 제외."""
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
     full  = title + " " + desc
-
     promo_hit = sum(1 for kw in PROMO_KW if kw in full)
     neg_hit   = sum(1 for kw in NEGATIVE_KW if kw in full)
-
-    # 홍보 키워드 1개 이상 + 부정 키워드 0개 → 홍보성으로 제외
     if promo_hit >= 1 and neg_hit == 0:
         return True
     return False
 
 
-LABEL_MAP = {
+# ============================
+# 라벨 매핑
+# ============================
+# Chamsol/klue-roberta 라벨
+ROBERTA_LABEL_MAP = {
     "positive":"긍정","pos":"긍정","LABEL_2":"긍정","긍정":"긍정",
     "negative":"부정","neg":"부정","LABEL_0":"부정","부정":"부정",
     "neutral":"중립","neu":"중립","LABEL_1":"중립","중립":"중립",
-    "부정":"부정","긍정":"긍정",
 }
+
+# tabularisai 5단계 → 3단계 매핑
+# Very Negative + Negative → 부정, Neutral → 중립, Positive + Very Positive → 긍정
+MULTI_LABEL_MAP = {
+    "Very Negative": "부정",
+    "Negative":      "부정",
+    "Neutral":       "중립",
+    "Positive":      "긍정",
+    "Very Positive": "긍정",
+    "LABEL_0": "부정",      # Very Negative
+    "LABEL_1": "부정",      # Negative
+    "LABEL_2": "중립",      # Neutral
+    "LABEL_3": "긍정",      # Positive
+    "LABEL_4": "긍정",      # Very Positive
+}
+
+# Very Negative은 강한 부정이므로 가중 보너스
+MULTI_NEG_BOOST = {"Very Negative", "LABEL_0"}
+
 
 def rule_based(text: str):
     neg = sum(1 for kw in NEGATIVE_KW if kw in text)
@@ -561,34 +463,6 @@ def rule_based(text: str):
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
-
-def ai_ensemble(text: str, model_e, model_r) -> tuple:
-    votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
-    electra_neg_score = 0.0
-    if model_e:
-        try:
-            for it in model_e(text[:512])[0]:
-                lbl = LABEL_MAP.get(it["label"])
-                if lbl:
-                    votes[lbl] += it["score"] * 1.6
-                    if lbl == "부정": electra_neg_score = it["score"]
-        except Exception: pass
-    if model_r:
-        try:
-            for it in model_r(text[:512])[0]:
-                lbl = LABEL_MAP.get(it["label"])
-                if lbl: votes[lbl] += it["score"] * 1.0
-        except Exception: pass
-    rule_lbl, rule_sc = rule_based(text)
-    votes[rule_lbl] += rule_sc * 0.8
-    total = sum(votes.values())
-    if total == 0: return "중립", 50
-    best  = max(votes, key=votes.get)
-    score = round(votes[best] / total * 100)
-    neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in text)
-    if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
-        best = "중립"; score = max(round(score * 0.7), 45)
-    return best, score
 
 
 # ============================
@@ -611,45 +485,22 @@ def build_naver_query(raw_keyword: str) -> str:
 
 
 # ============================
-# 네이버 검색 (블로그·지식인)
-# ============================
-def search_naver(query: str, search_type: str = "blog", display: int = 100) -> list:
-    url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params  = {"query": query, "display": min(display, 100), "sort": "date"}
-    try:
-        items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
-    except Exception:
-        items = []
-    label = "블로그" if search_type == "blog" else "지식인"
-    for item in items: item["출처"] = label; item["검색어"] = query
-    return items
-
-
-# ============================
 # [FIX 2] 카페·지식인 페이징 수정
-# 네이버 API: cafearticle, kin 모두 /v1/search/{type}.json 동일 엔드포인트
-# start 파라미터 최대 1000까지 지원, display 최대 100
-# 카페는 cafename 필터 제거 → 다이소 관련 카페글 전체 수집 후 is_daiso_related로 필터
 # ============================
 def collect_naver_paged(query: str, search_type: str, total: int) -> list:
-    """
-    블로그(blog) / 지식인(kin) 페이징 수집
-    start 최대 1000, 한 번에 최대 100건
-    """
+    """블로그(blog) / 지식인(kin) 페이징 수집
+    start 최대 1000, 한 번에 최대 100건"""
     all_items = []
     per_page  = 100
     start_idx = 1
     label = "블로그" if search_type == "blog" else "지식인"
-
     while len(all_items) < total:
-        if start_idx > 1000:       # 네이버 API 하드 제한
+        if start_idx > 1000:
             break
         remaining = total - len(all_items)
         fetch_cnt = min(per_page, remaining, 1000 - start_idx + 1)
         if fetch_cnt <= 0:
             break
-
         url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
         headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
         params  = {"query": query, "display": fetch_cnt, "start": start_idx, "sort": "date"}
@@ -658,33 +509,23 @@ def collect_naver_paged(query: str, search_type: str, total: int) -> list:
             items = resp.json().get("items", [])
         except Exception:
             break
-
         if not items:
             break
-
         for item in items:
             item["출처"]   = label
             item["검색어"] = query
         all_items.extend(items)
         start_idx += fetch_cnt
-
-        if len(items) < fetch_cnt:   # 결과가 더 이상 없음
+        if len(items) < fetch_cnt:
             break
-
     return all_items[:total]
 
 
 def collect_cafe_paged(query: str, total: int) -> list:
-    """
-    [FIX 2] 카페(cafearticle) 페이징 수집
-    - cafename 필터 제거: 다이소 공식 카페 외에도 다이소 관련 일반 카페글 모두 수집
-    - is_daiso_related()로 최종 필터링
-    - start 최대 1000
-    """
+    """[FIX 2] 카페(cafearticle) 페이징 수집"""
     all_items = []
     per_page  = 100
     start_idx = 1
-
     while len(all_items) < total:
         if start_idx > 1000:
             break
@@ -692,7 +533,6 @@ def collect_cafe_paged(query: str, total: int) -> list:
         fetch_cnt = min(per_page, remaining, 1000 - start_idx + 1)
         if fetch_cnt <= 0:
             break
-
         url     = "https://openapi.naver.com/v1/search/cafearticle.json"
         headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
         params  = {"query": query, "display": fetch_cnt, "start": start_idx, "sort": "date"}
@@ -701,22 +541,16 @@ def collect_cafe_paged(query: str, total: int) -> list:
             items = resp.json().get("items", [])
         except Exception:
             break
-
         if not items:
             break
-
         for item in items:
             item["출처"]   = "카페"
             item["검색어"] = query
-            # cafename이 있으면 channel로도 저장
             item["channel"] = item.get("cafename", "")
-
         all_items.extend(items)
         start_idx += fetch_cnt
-
         if len(items) < fetch_cnt:
             break
-
     return all_items[:total]
 
 
@@ -786,11 +620,6 @@ def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
         if dt and s <= dt <= e: result.append(item)
     return result
 
-def clean_text(text: str) -> str:
-    text = re.sub(r'<[^>]+>', '', text)
-    text = re.sub(r'&[a-zA-Z]+;', ' ', text)
-    return text.strip()
-
 
 # ============================
 # 품번 추출
@@ -800,6 +629,7 @@ DATE_PATS = [
     r'\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b',
     r'\b\d{4}년\s*\d{1,2}월', r'\b\d{1,2}월\s*\d{1,2}일',
 ]
+
 def is_date_like(t):
     for p in DATE_PATS:
         if re.fullmatch(p, t.strip()): return True
@@ -809,8 +639,7 @@ def extract_product_code(text):
     raw_nums = re.findall(r'\b(\d{3,6})\b', text)
     codes = []
     for c in raw_nums:
-        if is_date_like(c):
-            continue
+        if is_date_like(c): continue
         if VALID_PRODUCT_CODES and c in VALID_PRODUCT_CODES:
             codes.append(c)
         elif not VALID_PRODUCT_CODES:
@@ -899,14 +728,7 @@ def fmt_score(score) -> str:
 st.markdown("""
 <div class="app-header">
     <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-        <div style="
-            width:48px; height:48px;
-            background:#0066CC;
-            border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            flex-shrink:0;
-            box-shadow:0 2px 6px rgba(0,102,204,0.35);
-        ">
+        <div style="width:48px; height:48px;background:#0066CC;border-radius:50%;display:flex; align-items:center; justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,102,204,0.35);">
             <svg width="30" height="20" viewBox="0 0 60 38" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 2 H8 Q16 2 16 10 Q16 18 8 18 H0 Z M4 5 V15 H8 Q12 15 12 10 Q12 5 8 5 Z" fill="#FFFFFF"/>
                 <path d="M18 18 L24 2 L30 18 M20.5 12 H27.5" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>
@@ -916,17 +738,12 @@ st.markdown("""
                 <ellipse cx="54" cy="10" rx="5" ry="8" stroke="#FFFFFF" stroke-width="3" fill="none"/>
             </svg>
         </div>
-        <div style="
-            font-size:1.35rem; font-weight:900;
-            color:#0066CC; letter-spacing:0.12em;
-            font-family:'Inter',sans-serif;
-            line-height:1;
-        ">D</div>
+        <div style="font-size:1.35rem; font-weight:900;color:#0066CC; letter-spacing:0.12em;font-family:'Inter',sans-serif;line-height:1;">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
         <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa Collaboration</div>
+        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; Multilingual Sentiment × KLUE-RoBERTa Ensemble</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -948,7 +765,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── ① 수집 채널 ──────────────────────────────────────
+    # ── ① 수집 채널 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.4rem;">
         <div class="sb-section-icon">
@@ -961,48 +778,33 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns(2)
-
     with col_left:
         cb_col, icon_col = st.columns([1, 4])
         with cb_col:
             search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
         with icon_col:
-            st.markdown("""<div class="ch-row">
-                <div class="ch-icon ch-naver">N</div>
-                <span class="ch-label">블로그</span>
-            </div>""", unsafe_allow_html=True)
+            st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">블로그</span></div>', unsafe_allow_html=True)
 
         cb_col2, icon_col2 = st.columns([1, 4])
         with cb_col2:
             search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
         with icon_col2:
-            st.markdown("""<div class="ch-row">
-                <div class="ch-icon ch-naver">N</div>
-                <span class="ch-label">카페</span>
-            </div>""", unsafe_allow_html=True)
+            st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">카페</span></div>', unsafe_allow_html=True)
 
     with col_right:
         cb_col3, icon_col3 = st.columns([1, 4])
         with cb_col3:
             search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
         with icon_col3:
-            st.markdown("""<div class="ch-row">
-                <div class="ch-icon ch-naver">N</div>
-                <span class="ch-label">지식인</span>
-            </div>""", unsafe_allow_html=True)
+            st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">지식인</span></div>', unsafe_allow_html=True)
 
         cb_col4, icon_col4 = st.columns([1, 4])
         with cb_col4:
             search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
         with icon_col4:
-            st.markdown("""<div class="ch-row">
-                <div class="ch-icon ch-youtube">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
-                </div>
-                <span class="ch-label">유튜브</span>
-            </div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="ch-row"><div class="ch-icon ch-youtube"><svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg></div><span class="ch-label">유튜브</span></div>""", unsafe_allow_html=True)
 
-    # ── ② 검색어 ────────────────────────────────────────────
+    # ── ② 검색어 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
@@ -1013,26 +815,25 @@ with st.sidebar:
         <span class="sb-section-text">Searching Word</span>
     </div>
     """, unsafe_allow_html=True)
+
     keywords_input = st.text_area("", value="다이소 상품불량\n다이소 불량\n다이소 별로",
-                                  height=95, label_visibility="collapsed",
-                                  placeholder="줄바꿈으로 구분 · 최대 10개")
+                                   height=95, label_visibility="collapsed",
+                                   placeholder="줄바꿈으로 구분 · 최대 10개")
     st.markdown('<span class="sb-hint">줄바꿈으로 구분, 최대 10개<br>※ \'다이소\' 없으면 자동 추가됩니다</span>', unsafe_allow_html=True)
 
-    # ── ③ 수집 기간 ─────────────────────────────────────────
+    # ── ③ 수집 기간 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
         </div>
         <span class="sb-section-text">분석 기간</span>
     </div>
     """, unsafe_allow_html=True)
 
-    # [FIX 4] 날짜 간격 최소화: gap=0 스타일 컬럼 + margin 제거
     dc1, dc2 = st.columns(2, gap="small")
     with dc1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
@@ -1041,7 +842,7 @@ with st.sidebar:
         st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
         end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
 
-    # ── ④ 수집 개수 ─────────────────────────────────────────
+    # ── ④ 수집 개수 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
@@ -1054,43 +855,40 @@ with st.sidebar:
         <span class="sb-section-text">분석개수</span>
     </div>
     """, unsafe_allow_html=True)
-    display_count = st.number_input(
-        "", min_value=10, max_value=5000, value=100, step=10,
-        label_visibility="collapsed",
-        help="데이터 수집건수 (최소 10 ~ 최대 5,000)"
-    )
+
+    display_count = st.number_input("", min_value=10, max_value=5000, value=100, step=10,
+                                     label_visibility="collapsed",
+                                     help="데이터 수집건수 (최소 10 ~ 최대 5,000)")
     st.markdown('<span class="sb-hint">데이터 수집건수 · 10 ~ 5,000</span>', unsafe_allow_html=True)
 
-    # ── ⑤ 부정 확신도 ───────────────────────────────────────
+    # ── ⑤ 부정 확신도 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
         </div>
         <span class="sb-section-text">감성 파라미터</span>
     </div>
     """, unsafe_allow_html=True)
-    threshold = st.number_input(
-        "", min_value=40, max_value=95, value=55, step=5,
-        label_visibility="collapsed",
-        help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
-    )
+
+    threshold = st.number_input("", min_value=40, max_value=95, value=55, step=5,
+                                 label_visibility="collapsed",
+                                 help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록")
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
-    # ── [FIX 3] 감성 파라미터 기준 ────────────────────────────
+    # ── [FIX 3] 감성 파라미터 기준 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
         <span class="sb-section-text">PARAMETER GUIDE</span>
     </div>
     <div class="param-guide-box">
-        <b>📌 AI 모델 가중치 변경</b><br>
-        • ELECTRA 가중치: <code>* 1.6</code> (현재)<br>
-        • RoBERTa 가중치: <code>* 1.0</code> (현재)<br>
-        • 룰베이스 가중치: <code>* 0.8</code> (현재)<br>
+        <b>📌 AI 모델 가중치 구성</b><br>
+        • Multilingual Sentiment (tabularisai): <code>* 1.5</code> (Very Negative: <code>* 1.8</code>)<br>
+        • KLUE-RoBERTa (Chamsol): <code>* 1.0</code><br>
+        • 룰베이스 키워드: <code>* 0.8</code><br>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1112,18 +910,18 @@ if run_btn:
 
     keywords = [build_naver_query(k) for k in keywords_raw]
 
-    with st.spinner("AI 앙상블 모델 초기화 중... (KR-ELECTRA + KLUE-RoBERTa)"):
-        model_e = load_electra()
+    with st.spinner("AI 앙상블 모델 초기화 중... (Multilingual Sentiment + KLUE-RoBERTa)"):
+        model_multi = load_multilingual()
         model_r = load_roberta()
 
-    # ── 수집 태스크 구성 ──────────────────────────────────────
+    # ── 수집 태스크 구성 ──
     collect_tasks = []
     for kw in keywords:
         if search_blog: collect_tasks.append(("blog", kw, "블로그"))
         if search_kin:  collect_tasks.append(("kin",  kw, "지식인"))
         if search_cafe: collect_tasks.append(("cafe", kw, "카페"))
         if search_yt and YOUTUBE_API_KEY:
-                        collect_tasks.append(("yt",   kw, "유튜브"))
+            collect_tasks.append(("yt",   kw, "유튜브"))
 
     prog      = st.progress(0)
     prog_text = st.empty()
@@ -1137,7 +935,6 @@ if run_btn:
         if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
         return label, kw, []
 
-    import concurrent.futures
     total_tasks = len(collect_tasks)
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -1149,32 +946,29 @@ if run_btn:
             done += 1
             prog.progress(done / max(total_tasks, 1))
             prog_text.markdown(f'<span style="font-size:0.78rem;color:#718096;">수집 중 {done}/{total_tasks} 완료</span>', unsafe_allow_html=True)
-
     prog.empty(); prog_text.empty()
 
-    # ── 중복 제거 ──────────────────────────────────────────────
+    # ── 중복 제거 ──
     seen, unique_items = set(), []
     for item in all_items:
         lnk = item.get("link","")
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
-    # ── 다이소 관련성 필터 (카페는 제외 — 카페글은 이미 query에 다이소 포함) ──
+    # ── 다이소 관련성 필터 ──
     before_rel = len(unique_items)
-    unique_items = [
-        it for it in unique_items
-        if it.get("출처") == "카페" or is_daiso_related(it)
-    ]
+    unique_items = [it for it in unique_items
+                    if it.get("출처") == "카페" or is_daiso_related(it)]
     rel_excluded = before_rel - len(unique_items)
 
-    # ── [FIX 1] 홍보성 글 제외 ─────────────────────────────────
+    # ── [FIX 1] 홍보성 글 제외 ──
     before_promo = len(unique_items)
     unique_items = [it for it in unique_items if not is_promotional(it)]
     promo_excluded = before_promo - len(unique_items)
 
-    # ── 유심 관련 제외 ─────────────────────────────────────────
+    # ── 유심 관련 제외 ──
     USIM_EXCLUDE_KW = [
-        "유심","USIM","유심칩","유심카드","심카드","SIM카드",
-        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심","자","정력","정액"
+        "유심","USIM","유심칩","유심카드","심카드","SIM카드","통신사",
+        "SKT","KT","LGU+","알뜰폰","eSIM","이심","자","정력","정액"
     ]
     def is_usim_related(it):
         text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
@@ -1184,12 +978,12 @@ if run_btn:
     unique_items = [it for it in unique_items if not is_usim_related(it)]
     usim_excluded = before_usim - len(unique_items)
 
-    # ── 날짜 필터 ──────────────────────────────────────────────
+    # ── 날짜 필터 ──
     filtered = filter_by_date(unique_items, start_date, end_date)
     if not filtered:
         st.warning("해당 기간에 결과가 없습니다. 날짜 범위나 검색어를 확인해주세요."); st.stop()
 
-    # ── 수집 완료 안내 ─────────────────────────────────────────
+    # ── 수집 완료 안내 ──
     notes = []
     if rel_excluded > 0:    notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
     if promo_excluded > 0:  notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
@@ -1200,17 +994,17 @@ if run_btn:
     st.markdown(f"""
     <div class="card" style="border-left:3px solid #0066CC;">
         <span style="font-size:0.85rem;color:#0066CC;font-weight:600;">
-        ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후){note_str}
+            ✅ 수집 완료 — 총 <strong>{len(filtered)}</strong>건 (중복 제거 후){note_str}
         </span><br>
         <span style="font-size:0.72rem;color:#718096;">{' &nbsp;|&nbsp; '.join(collect_log)}</span>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── AI 분석 ────────────────────────────────────────────────
+
+    # ── AI 분석 ──
     results = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
-
     BATCH   = 32
     total_f = len(filtered)
 
@@ -1225,30 +1019,33 @@ if run_btn:
             texts.append(full)
             metas.append((src, item, title))
 
-        e_batch = model_e(texts, batch_size=BATCH, truncation=True, max_length=512) if model_e else [None]*len(texts)
+        e_batch = model_multi(texts, batch_size=BATCH, truncation=True, max_length=512) if model_multi else [None]*len(texts)
         r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=512) if model_r else [None]*len(texts)
 
         for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
             votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
-            electra_neg_score = 0.0
+            multi_neg_score = 0.0
             if e_batch[idx]:
                 try:
                     for it in e_batch[idx]:
-                        lbl = LABEL_MAP.get(it["label"])
+                        lbl = MULTI_LABEL_MAP.get(it["label"])
                         if lbl:
-                            votes[lbl] += it["score"] * 1.6
-                            if lbl == "부정": electra_neg_score = it["score"]
+                            weight = 1.5
+                            if it["label"] in MULTI_NEG_BOOST:
+                                weight = 1.8
+                            votes[lbl] += it["score"] * weight
+                            if lbl == "부정":
+                                multi_neg_score += it["score"]
                 except: pass
             if r_batch[idx]:
                 try:
                     for it in r_batch[idx]:
-                        lbl = LABEL_MAP.get(it["label"])
+                        lbl = ROBERTA_LABEL_MAP.get(it["label"])
                         if lbl: votes[lbl] += it["score"] * 1.0
                 except: pass
 
             rule_lbl, rule_sc = rule_based(full)
             votes[rule_lbl] += rule_sc * 0.8
-
             total_v = sum(votes.values())
             if total_v == 0:
                 sentiment, score = "중립", 50
@@ -1256,17 +1053,14 @@ if run_btn:
                 best  = max(votes, key=votes.get)
                 score = round(votes[best] / total_v * 100)
                 neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
-                if best == "부정" and not (electra_neg_score >= 0.40 or neg_kw_cnt >= 1):
+                if best == "부정" and not (multi_neg_score >= 0.35 or neg_kw_cnt >= 1):
                     best = "중립"; score = max(round(score * 0.7), 45)
                 sentiment = best
 
             if score < threshold and sentiment != "중립":
                 sentiment = "중립"
 
-            date_str = item.get("날짜","") if src == "유튜브" else (
-                lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
-            )(parse_date(item))
-
+            date_str = item.get("날짜","") if src == "유튜브" else (lambda dt: dt.strftime("%Y-%m-%d") if dt else "")(parse_date(item))
             prod_code = extract_product_code(full) if src != "유튜브" else ""
             prod_name = match_product_name(prod_code)
 
@@ -1287,15 +1081,14 @@ if run_btn:
         progress_bar.progress(done_so_far / total_f)
         status_text.markdown(
             f'<span style="font-size:0.78rem;color:#718096;">AI 분석 중 {done_so_far} / {total_f}</span>',
-            unsafe_allow_html=True
-        )
+            unsafe_allow_html=True)
 
     progress_bar.empty(); status_text.empty()
 
-    # ── 탭 렌더링 ───────────────────────────────────────────────
-    tab_dash, tab_blog, tab_kin, tab_cafe, tab_yt = st.tabs([
-        "📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"
-    ])
+
+    # ── 탭 렌더링 ──
+    tab_dash, tab_blog, tab_kin, tab_cafe, tab_yt = st.tabs(
+        ["📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"])
 
     total = len(results)
     pos   = sum(1 for r in results if r["감성"]=="긍정")
@@ -1323,6 +1116,7 @@ if run_btn:
 
     with tab_dash:
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
+
         c1, c2, c3, c4 = st.columns(4)
         for col, cls, lbl, val, pct, ic_txt in [
             (c1,"total","전체 수집",  str(total), "100%",                                    "전체"),
@@ -1333,15 +1127,14 @@ if run_btn:
             with col:
                 st.markdown(f"""
                 <div class="metric-card {cls}">
-                    <div class="metric-label">
-                        <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>
-                        {lbl}
-                    </div>
+                    <div class="metric-label"><span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}</div>
                     <div class="metric-value">{val}</div>
                     <div class="metric-pct">{pct}</div>
-                </div>""", unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
         st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+
         d1, d2, d3 = st.columns(3)
         sub_u  = len(sub_cnt)
         code_u = len(set(r["품번"] for r in results if r.get("품번")))
@@ -1352,23 +1145,21 @@ if run_btn:
                 <div class="card" style="text-align:center;padding:1rem 0.75rem;">
                     <div style="font-size:1.6rem;font-weight:700;color:#0066CC;font-family:'Inter',sans-serif;">{val}</div>
                     <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
-                </div>""", unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
         if date_neg:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 부정 건수</span></div>', unsafe_allow_html=True)
             chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","부정수"]).sort_values("월")
-            chart = (
-                alt.Chart(chart_df)
+            chart = (alt.Chart(chart_df)
                 .mark_bar(color="#0066CC", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
                 .encode(
                     x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0, labelFontSize=12)),
                     y=alt.Y("부정수:Q", axis=alt.Axis(title="부정 건수", titleFontSize=11)),
                     tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("부정수:Q", title="건수")]
-                )
-                .properties(height=220)
+                ).properties(height=220)
                 .configure_view(strokeWidth=0)
-                .configure_axis(grid=False, domain=False)
-            )
+                .configure_axis(grid=False, domain=False))
             st.altair_chart(chart, use_container_width=True)
 
         col_top1, col_top2 = st.columns(2)
@@ -1387,6 +1178,7 @@ if run_btn:
                 cls = "r1" if rank == 1 else ""
                 html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
+
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("부정")} <span style="font-size:0.95rem;font-weight:600;">주요 부정 글 목록</span></div>', unsafe_allow_html=True)
         neg_results = [r for r in results if r["감성"] == "부정"]
@@ -1408,8 +1200,7 @@ if run_btn:
                     '<span>📅 ' + r["날짜"] + '</span>'
                     + _sub + _code + _badge +
                     '</div>'
-                    '</div>'
-                )
+                    '</div>')
                 st.markdown(_html, unsafe_allow_html=True)
         else:
             st.info("부정으로 분류된 글이 없습니다.")
@@ -1426,6 +1217,7 @@ if run_btn:
             csv = pd.DataFrame(results).to_csv(index=False, encoding="utf-8-sig")
             st.download_button("📥 CSV 다운로드", csv.encode("utf-8-sig"),
                 f"ISSUE_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
+
 
     def render_detail_tab(src_results, src_name):
         if not src_results:
@@ -1445,12 +1237,11 @@ if run_btn:
             with col:
                 st.markdown(f"""
                 <div class="metric-card {cls}">
-                    <div class="metric-label">
-                        <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
-                    </div>
+                    <div class="metric-label"><span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}</div>
                     <div class="metric-value">{val}</div>
                     <div class="metric-pct">{round(int(val)/t*100) if t else 0}%</div>
-                </div>""", unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
         st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
@@ -1464,6 +1255,7 @@ if run_btn:
             t2 = sum(s.values())
             kw_rows.append({"검색어":kw,"긍정":s["긍정"],"부정":s["부정"],"중립":s["중립"],
                             "합계":t2,"부정률(%)":round(s["부정"]/t2*100,1) if t2 else 0})
+
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("검색")} <span style="font-size:0.95rem;font-weight:600;">검색어별 분포</span></div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(kw_rows), use_container_width=True, hide_index=True, height=160)
 
@@ -1486,8 +1278,7 @@ if run_btn:
                 '<span>📅 ' + r["날짜"] + '</span>'
                 + _sub + _code + _name + _price + _badge +
                 '</div>'
-                '</div>'
-            )
+                '</div>')
             st.markdown(_html, unsafe_allow_html=True)
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
@@ -1503,6 +1294,7 @@ if run_btn:
     with tab_cafe:
         render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
 
+
     with tab_yt:
         yt_results = [r for r in results if r["출처"]=="유튜브"]
         if not yt_results:
@@ -1515,6 +1307,7 @@ if run_btn:
             yt_p  = sum(1 for r in yt_results if r["감성"]=="긍정")
             yt_n  = sum(1 for r in yt_results if r["감성"]=="부정")
             yt_ne = sum(1 for r in yt_results if r["감성"]=="중립")
+
             yc1,yc2,yc3,yc4 = st.columns(4)
             for col, cls, lbl, val, ic_txt in [
                 (yc1,"total","영상",str(yt_t),"영상"),
@@ -1525,12 +1318,11 @@ if run_btn:
                 with col:
                     st.markdown(f"""
                     <div class="metric-card {cls}">
-                        <div class="metric-label">
-                            <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
-                        </div>
+                        <div class="metric-label"><span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}</div>
                         <div class="metric-value">{val}</div>
                         <div class="metric-pct">{round(int(val)/yt_t*100) if yt_t else 0}%</div>
-                    </div>""", unsafe_allow_html=True)
+                    </div>
+                    """, unsafe_allow_html=True)
 
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("영상")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 (조회수 순)</span></div>', unsafe_allow_html=True)
             for r in sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)[:20]:
@@ -1551,7 +1343,8 @@ if run_btn:
                         <span>💬 {comments}</span>
                         <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
                     </div>
-                </div>""", unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
             st.markdown("""
             <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;text-align:center;">
@@ -1559,8 +1352,7 @@ if run_btn:
                 <div class="badge-coming" style="display:inline-flex;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    추가 예정 기능입니다
+                    </svg>추가 예정 기능입니다
                 </div>
                 <div style="font-size:0.75rem;color:#94A3B8;margin-top:0.5rem;">다음 버전에서 제공될 예정입니다</div>
             </div>
@@ -1568,6 +1360,6 @@ if run_btn:
 
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
-        <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS ISSUE FINDER · KR-ELECTRA × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
+        <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS ISSUE FINDER · Multilingual Sentiment × KLUE-RoBERTa Ensemble · Created by 데이터분석팀</span>
     </div>
     """, unsafe_allow_html=True)
