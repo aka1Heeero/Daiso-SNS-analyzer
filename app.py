@@ -48,6 +48,9 @@ st.markdown("""
     --neu-bg:     #FEFCE8;
     --shadow:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
     --shadow-md:  0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+    --admin:      #7C3AED;
+    --admin-lt:   #F5F3FF;
+    --admin-md:   #DDD6FE;
 }
 
 html, body, .stApp {
@@ -98,16 +101,25 @@ html, body, .stApp {
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] > label { display: none !important; }
 
-.date-label { font-size: 0.7rem; color: #718096; margin-bottom: 1px; margin-top: 0; display: block; line-height: 1.1; }
+.date-label {
+    font-size: 0.7rem; color: #718096; margin-bottom: 1px;
+    margin-top: 0; display: block; line-height: 1.1;
+}
 
 [data-testid="stSidebar"] [data-testid="column"] {
     gap: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important;
+    min-width: 0 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+    gap: 0.3rem !important;
 }
 
 .app-header {
     background: var(--bg-white); border-bottom: 1px solid var(--border);
     padding: 1.25rem 2rem; display: flex; align-items: center; gap: 0.75rem;
     margin-bottom: 1.5rem; border-radius: 12px; box-shadow: var(--shadow);
+    position: relative;
 }
 .header-icon {
     width: 40px; height: 40px; background: var(--primary); border-radius: 10px;
@@ -215,6 +227,7 @@ html, body, .stApp {
 [data-testid="stNumberInput"] > div { border-radius: 8px !important; }
 [data-testid="stNumberInput"] button { color: var(--primary) !important; }
 
+/* ── 기본 버튼 (메인 영역) ── */
 .stButton > button {
     background: var(--primary) !important; color: #FFFFFF !important;
     border: none !important; border-radius: 8px !important;
@@ -225,24 +238,28 @@ html, body, .stApp {
 }
 .stButton > button:hover { background: #0052A3 !important; box-shadow: 0 4px 12px rgba(0,102,204,0.3) !important; }
 
-[data-testid="stSidebar"] .stButton > button {
+/* ── 사이드바 첫 번째 버튼 = AI분석시작 → 노란색 ── */
+[data-testid="stSidebar"] .stButton:first-of-type > button {
     background: #FFD600 !important; color: #1A202C !important;
     font-size: 1.05rem !important; font-weight: 800 !important;
     letter-spacing: 0.03em !important; border: none !important;
     box-shadow: 0 2px 8px rgba(255,214,0,0.35) !important;
 }
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: #F5C800 !important; box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important; color: #1A202C !important;
+[data-testid="stSidebar"] .stButton:first-of-type > button:hover {
+    background: #F5C800 !important;
+    box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important;
+    color: #1A202C !important;
 }
 
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][key="stop_btn"] button,
-[data-testid="stSidebar"] div:has(> button[kind="secondary"]):last-child button {
+/* ── 사이드바 두 번째(마지막) 버튼 = 중지 → 파란색 ── */
+[data-testid="stSidebar"] .stButton:last-of-type > button {
     background: #0066CC !important; color: #FFFFFF !important;
     font-size: 1.05rem !important; font-weight: 800 !important;
     box-shadow: 0 2px 8px rgba(0,102,204,0.35) !important;
 }
-[data-testid="stSidebar"] div:has(> button[kind="secondary"]):last-child button:hover {
-    background: #0052A3 !important; box-shadow: 0 4px 14px rgba(0,102,204,0.5) !important;
+[data-testid="stSidebar"] .stButton:last-of-type > button:hover {
+    background: #0052A3 !important;
+    box-shadow: 0 4px 14px rgba(0,102,204,0.5) !important;
 }
 
 .stDownloadButton > button {
@@ -288,11 +305,121 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
 }
 .param-guide-box b { color: #0066CC; }
 .param-guide-box code { background: #E8F1FB; color: #0052A3; border-radius: 4px; padding: 1px 5px; font-size: 0.74rem; font-family: monospace; }
+
+/* ==============================
+   관리자 모드 스타일
+   ============================== */
+
+/* 관리자 버튼 (헤더 오른쪽 상단 고정) */
+.admin-btn-wrap {
+    position: fixed;
+    top: 0.75rem;
+    right: 1.5rem;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.admin-badge-on {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    background: var(--admin); color: #FFFFFF;
+    padding: 0.3rem 0.75rem; border-radius: 20px;
+    font-size: 0.72rem; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(124,58,237,0.35);
+    letter-spacing: 0.04em;
+}
+
+/* 관리자 패널 */
+.admin-panel {
+    background: var(--bg-white);
+    border: 2px solid var(--admin);
+    border-radius: 14px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.12);
+}
+.admin-panel-title {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 1rem; font-weight: 700; color: var(--admin);
+    margin-bottom: 1rem; padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--admin-md);
+}
+.admin-panel-icon {
+    width: 28px; height: 28px; background: var(--admin); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: #FFFFFF !important; font-size: 0.8rem; flex-shrink: 0;
+}
+
+.admin-kw-tag {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--admin-lt); color: var(--admin);
+    border: 1px solid var(--admin-md); border-radius: 20px;
+    padding: 0.25rem 0.65rem; font-size: 0.76rem; font-weight: 600;
+    margin: 0.2rem;
+}
+.admin-kw-tag .del-x {
+    cursor: pointer; font-size: 0.8rem; color: var(--admin);
+    font-weight: 900; line-height: 1;
+}
+
+.admin-section {
+    background: var(--admin-lt); border: 1px solid var(--admin-md);
+    border-left: 3px solid var(--admin); border-radius: 0 8px 8px 0;
+    padding: 0.6rem 0.9rem; margin: 0.75rem 0 0.5rem;
+    font-size: 0.75rem; font-weight: 700; color: var(--admin);
+    text-transform: uppercase; letter-spacing: 0.07em;
+}
+
+.admin-stat-box {
+    background: linear-gradient(135deg, var(--admin-lt), #EDE9FE);
+    border: 1px solid var(--admin-md); border-radius: 10px;
+    padding: 0.9rem 1.2rem; text-align: center;
+}
+.admin-stat-num {
+    font-size: 1.8rem; font-weight: 700; color: var(--admin);
+    font-family: 'Inter', sans-serif; line-height: 1;
+}
+.admin-stat-label { font-size: 0.72rem; color: var(--text3); margin-top: 0.25rem; }
+
+.admin-login-modal {
+    max-width: 340px; margin: 3rem auto;
+    background: var(--bg-white);
+    border: 2px solid var(--admin);
+    border-radius: 16px; padding: 2rem 1.75rem;
+    text-align: center; box-shadow: 0 8px 32px rgba(124,58,237,0.18);
+}
+.admin-login-icon {
+    width: 52px; height: 52px; background: var(--admin); border-radius: 14px;
+    margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; color: #FFFFFF !important;
+}
+
+.relearn-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: #ECFDF5; color: #059669;
+    border: 1px solid #A7F3D0; border-radius: 6px;
+    padding: 0.3rem 0.65rem; font-size: 0.72rem; font-weight: 600;
+}
+
+/* 관리자 텍스트 입력 */
+.admin-panel .stTextInput input,
+.admin-panel .stTextArea textarea {
+    border: 1.5px solid var(--admin-md) !important;
+    border-radius: 8px !important;
+}
+.admin-panel .stTextInput input:focus,
+.admin-panel .stTextArea textarea:focus {
+    border-color: var(--admin) !important;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.12) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
 
-# ============================================== 비밀번호 인증
+# ============================================================
+# ① 일반 사용자 비밀번호 인증
+# ============================================================
 def check_password():
     if st.session_state.get("authenticated"):
         return True
@@ -317,12 +444,28 @@ def check_password():
 if not check_password():
     st.stop()
 
-# ============================================== API키
+
+# ============================================================
+# ② 관리자 모드 세션 초기화
+# ============================================================
+if "admin_mode"          not in st.session_state: st.session_state["admin_mode"]          = False
+if "admin_show_login"    not in st.session_state: st.session_state["admin_show_login"]    = False
+if "admin_exclude_kws"   not in st.session_state: st.session_state["admin_exclude_kws"]   = []   # 제외 키워드 목록
+if "admin_retrain_log"   not in st.session_state: st.session_state["admin_retrain_log"]   = []   # 재학습 로그
+if "admin_excluded_urls" not in st.session_state: st.session_state["admin_excluded_urls"] = {}   # {url: reason}
+
+ADMIN_PASSWORD = "admin1"   # ← 초기 관리자 비밀번호 (secrets로 이전 권장)
+
+# ============================================================
+# API키
+# ============================================================
 NAVER_CLIENT_ID     = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
 
-# ============================================== 구글시트 불러오기 (품번,품명,소분류)
+# ============================================================
+# 구글시트 불러오기 (품번,품명,소분류)
+# ============================================================
 @st.cache_data(ttl=3600)
 def load_product_db():
     try:
@@ -353,11 +496,10 @@ def load_subcategories():
 
 SUBCATEGORIES = load_subcategories()
 
-# ============================================== AI모델링 (앙상블)
-# [개선] tabularisai: 5단계 감성분석, 23개 언어 지원, 2025년 8월 최신 업데이트
-# [유지] Chamsol/klue-roberta: 한국어 전용 감성분석
-# [제거] snunlp/KR-ELECTRA-discriminator: 감성분석 모델이 아닌 discriminator였으므로 제거
 
+# ============================================================
+# AI모델링 (앙상블)
+# ============================================================
 @st.cache_resource
 def load_multilingual():
     try:
@@ -375,19 +517,19 @@ def load_roberta():
         return None
 
 
-# ============================
-# 텍스트 전처리 (다른 함수들이 의존하므로 먼저 정의)
-# ============================
+# ============================================================
+# 텍스트 전처리
+# ============================================================
 def clean_text(text: str) -> str:
     text = re.sub(r'<[^>]+>', '', text)
-    text = re.sub(r'&[#\w]+;', ' ', text)  # &#39; &#x27; &amp; 등 모두 처리
+    text = re.sub(r'&[#\w]+;', ' ', text)
     return text.strip()
 
 
-# ============================
-# 룰베이스 & 앙상블
-# ============================
-NEGATIVE_KW = [
+# ============================================================
+# 룰베이스 키워드 — 세션 상태와 연동하여 관리자가 추가/제거 가능
+# ============================================================
+BASE_NEGATIVE_KW = [
     "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
     "쓰레기","구려","나빠","고장","터졌","망가","깨졌","불편","아쉬워","위험",
     "조심","주의","문제","하자","뜯겨","냄새","오염","불결","지저분","더럽",
@@ -402,16 +544,13 @@ NEGATIVE_KW = [
     "금방부서","금방 부서",
 ]
 
-POSITIVE_KW = [
+BASE_POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
     "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱",
     "갓성비","득템","완전좋","완전 좋","행복","사랑","최애","예쁘다","예쁜",
 ]
 
-# ============================
-# [FIX 1] 홍보성 글 제외 키워드
-# ============================
-PROMO_KW = [
+BASE_PROMO_KW = [
     "다이소 매장", "다이소 오픈", "다이소 신상", "다이소 신제품", "다이소 근처",
     "다이소 위치", "다이소 영업시간", "다이소 매장 위치", "다이소 점포",
     "다이소 방문", "다이소 주차", "다이소에서 구입", "다이소 쇼핑",
@@ -421,63 +560,128 @@ PROMO_KW = [
     "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천",
 ]
 
+# 세션에 없으면 기본값으로 초기화
+if "neg_kw_list"   not in st.session_state: st.session_state["neg_kw_list"]   = list(BASE_NEGATIVE_KW)
+if "pos_kw_list"   not in st.session_state: st.session_state["pos_kw_list"]   = list(BASE_POSITIVE_KW)
+if "promo_kw_list" not in st.session_state: st.session_state["promo_kw_list"] = list(BASE_PROMO_KW)
+if "exclude_title_kw_list" not in st.session_state: st.session_state["exclude_title_kw_list"] = []  # 제목 직접 제외
 
-# ============================
-# [FIX 1] 홍보성 글 판단 함수
-# ============================
+def get_neg_kw():   return st.session_state["neg_kw_list"]
+def get_pos_kw():   return st.session_state["pos_kw_list"]
+def get_promo_kw(): return st.session_state["promo_kw_list"]
+def get_excl_kw():  return st.session_state["exclude_title_kw_list"]
+
+
+# ============================================================
+# 관리자 재학습 반영 함수
+# ============================================================
+def admin_apply_keyword(kw_type: str, keyword: str, action: str = "add"):
+    """
+    kw_type : 'neg' | 'pos' | 'promo' | 'exclude'
+    action  : 'add' | 'remove'
+    """
+    kw = keyword.strip()
+    if not kw:
+        return False, "키워드가 비어 있습니다."
+
+    key_map = {
+        "neg":     "neg_kw_list",
+        "pos":     "pos_kw_list",
+        "promo":   "promo_kw_list",
+        "exclude": "exclude_title_kw_list",
+    }
+    label_map = {
+        "neg": "부정 키워드", "pos": "긍정 키워드",
+        "promo": "홍보 제외 키워드", "exclude": "제목 직접 제외 키워드",
+    }
+    key = key_map.get(kw_type)
+    if not key:
+        return False, "잘못된 키워드 유형입니다."
+
+    lst = st.session_state[key]
+    if action == "add":
+        if kw in lst:
+            return False, f"이미 등록된 키워드입니다: {kw}"
+        lst.append(kw)
+        log_msg = f"[추가] {label_map[kw_type]} → '{kw}'"
+    else:  # remove
+        if kw not in lst:
+            return False, f"목록에 없는 키워드입니다: {kw}"
+        lst.remove(kw)
+        log_msg = f"[삭제] {label_map[kw_type]} → '{kw}'"
+
+    st.session_state["admin_retrain_log"].append({
+        "시각": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "내용": log_msg
+    })
+    return True, log_msg
+
+
+# ============================================================
+# 홍보성 글 판단
+# ============================================================
 def is_promotional(item: dict) -> bool:
-    """제목+본문에 홍보성 키워드가 포함되어 있고,
-    부정 키워드가 1개도 없으면 홍보성 글로 판단해 제외."""
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
     full  = title + " " + desc
-    promo_hit = sum(1 for kw in PROMO_KW if kw in full)
-    neg_hit   = sum(1 for kw in NEGATIVE_KW if kw in full)
+    promo_hit = sum(1 for kw in get_promo_kw() if kw in full)
+    neg_hit   = sum(1 for kw in get_neg_kw()   if kw in full)
     if promo_hit >= 1 and neg_hit == 0:
         return True
     return False
 
 
-# ============================
+# ============================================================
+# 제목 직접 제외 (관리자가 등록한 키워드가 제목에 포함되면 제외)
+# ============================================================
+def is_admin_excluded(item: dict) -> bool:
+    # URL 직접 제외
+    if item.get("link","") in st.session_state.get("admin_excluded_urls", {}):
+        return True
+    # 제목 키워드 제외
+    title = clean_text(item.get("title", ""))
+    for kw in get_excl_kw():
+        if kw in title:
+            return True
+    return False
+
+
+# ============================================================
 # 라벨 매핑
-# ============================
-# Chamsol/klue-roberta 라벨
+# ============================================================
 ROBERTA_LABEL_MAP = {
     "positive":"긍정","pos":"긍정","LABEL_2":"긍정","긍정":"긍정",
     "negative":"부정","neg":"부정","LABEL_0":"부정","부정":"부정",
     "neutral":"중립","neu":"중립","LABEL_1":"중립","중립":"중립",
 }
 
-# tabularisai 5단계 → 3단계 매핑
-# Very Negative + Negative → 부정, Neutral → 중립, Positive + Very Positive → 긍정
 MULTI_LABEL_MAP = {
     "Very Negative": "부정",
     "Negative":      "부정",
     "Neutral":       "중립",
     "Positive":      "긍정",
     "Very Positive": "긍정",
-    "LABEL_0": "부정",      # Very Negative
-    "LABEL_1": "부정",      # Negative
-    "LABEL_2": "중립",      # Neutral
-    "LABEL_3": "긍정",      # Positive
-    "LABEL_4": "긍정",      # Very Positive
+    "LABEL_0": "부정",
+    "LABEL_1": "부정",
+    "LABEL_2": "중립",
+    "LABEL_3": "긍정",
+    "LABEL_4": "긍정",
 }
 
-# Very Negative은 강한 부정이므로 가중 보너스
 MULTI_NEG_BOOST = {"Very Negative", "LABEL_0"}
 
 
 def rule_based(text: str):
-    neg = sum(1 for kw in NEGATIVE_KW if kw in text)
-    pos = sum(1 for kw in POSITIVE_KW if kw in text)
+    neg = sum(1 for kw in get_neg_kw() if kw in text)
+    pos = sum(1 for kw in get_pos_kw() if kw in text)
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
 
 
-# ============================
+# ============================================================
 # 다이소 관련성 필터
-# ============================
+# ============================================================
 DAISO_VARIANTS = ["다이소", "DAISO", "daiso"]
 
 def is_daiso_related(item: dict) -> bool:
@@ -494,12 +698,10 @@ def build_naver_query(raw_keyword: str) -> str:
     return kw
 
 
-# ============================
-# [FIX 2] 카페·지식인 페이징 수정
-# ============================
+# ============================================================
+# 네이버 페이징 수집
+# ============================================================
 def collect_naver_paged(query: str, search_type: str, total: int) -> list:
-    """블로그(blog) / 지식인(kin) 페이징 수집
-    start 최대 1000, 한 번에 최대 100건"""
     all_items = []
     per_page  = 100
     start_idx = 1
@@ -532,7 +734,6 @@ def collect_naver_paged(query: str, search_type: str, total: int) -> list:
 
 
 def collect_cafe_paged(query: str, total: int) -> list:
-    """[FIX 2] 카페(cafearticle) 페이징 수집"""
     all_items = []
     per_page  = 100
     start_idx = 1
@@ -564,9 +765,9 @@ def collect_cafe_paged(query: str, total: int) -> list:
     return all_items[:total]
 
 
-# ============================
+# ============================================================
 # YouTube
-# ============================
+# ============================================================
 def search_youtube(query: str, max_results: int = 30) -> list:
     if not YOUTUBE_API_KEY: return []
     try:
@@ -611,11 +812,10 @@ def search_youtube(query: str, max_results: int = 30) -> list:
     return results
 
 
-# ============================
+# ============================================================
 # 날짜 파싱 & 필터
-# ============================
+# ============================================================
 def parse_date(item: dict):
-    """날짜 파싱: 블로그는 postdate, 지식인/카페는 날짜 필드가 없으므로 None 반환"""
     ds = item.get("postdate") or item.get("pubDate", "")
     if not ds:
         return None
@@ -625,7 +825,6 @@ def parse_date(item: dict):
     except: return None
 
 def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
-    """날짜 필터: 날짜 정보가 없는 항목(지식인/카페)은 날짜 필터를 통과시킴"""
     s = datetime(start_dt.year, start_dt.month, start_dt.day)
     e = datetime(end_dt.year,   end_dt.month,   end_dt.day, 23, 59, 59)
     result = []
@@ -635,7 +834,6 @@ def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
             dt = item.get("pub_dt")
         else:
             dt = parse_date(item)
-        # 날짜 정보가 있으면 범위 체크, 없으면(지식인/카페) 그냥 통과
         if dt is None:
             result.append(item)
         elif s <= dt <= e:
@@ -643,9 +841,9 @@ def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
     return result
 
 
-# ============================
-# 품번 추출
-# ============================
+# ============================================================
+# 품번/소분류 추출
+# ============================================================
 DATE_PATS = [
     r'\b20\d{6}\b', r'\b\d{4}[-./]\d{2}[-./]\d{2}\b',
     r'\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b',
@@ -702,9 +900,9 @@ def match_product_name(code):
     return ""
 
 
-# ============================
+# ============================================================
 # 엑셀 생성
-# ============================
+# ============================================================
 def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = "DAISO SNS ISSUE FINDER"
     headers = ["출처","검색어","소분류","품번","품명","가격언급","제목","링크","날짜","감성","확신도(%)","채널/카페명","조회수","좋아요","댓글수"]
@@ -729,9 +927,9 @@ def create_excel(data: list, start_dt: date, end_dt: date) -> io.BytesIO:
     return buf
 
 
-# ============================
+# ============================================================
 # 헬퍼
-# ============================
+# ============================================================
 SENT_BADGE = {"긍정":"badge-pos","부정":"badge-neg","중립":"badge-neu"}
 
 def icon(label: str) -> str:
@@ -744,9 +942,227 @@ def fmt_score(score) -> str:
         return f"{score}%"
 
 
-# ============================
+# ============================================================
+# ③ 관리자 버튼 — 헤더 오른쪽 상단 고정
+# ============================================================
+admin_col1, admin_col2 = st.columns([10, 1])
+with admin_col2:
+    if st.session_state["admin_mode"]:
+        if st.button("🔓 관리자", key="admin_toggle_btn", help="관리자 모드 ON — 클릭하여 로그아웃"):
+            st.session_state["admin_mode"]       = False
+            st.session_state["admin_show_login"] = False
+            st.rerun()
+    else:
+        if st.button("🔐 관리자", key="admin_toggle_btn", help="관리자 모드로 로그인"):
+            st.session_state["admin_show_login"] = not st.session_state["admin_show_login"]
+            st.rerun()
+
+# 관리자 로그인 팝업 (인라인)
+if st.session_state["admin_show_login"] and not st.session_state["admin_mode"]:
+    with st.container():
+        st.markdown("""
+        <div class="admin-login-modal">
+            <div class="admin-login-icon">🛡️</div>
+            <div class="login-title" style="color:#7C3AED;">관리자 로그인</div>
+            <div class="login-sub">관리자 전용 기능에 접근합니다</div>
+        </div>
+        """, unsafe_allow_html=True)
+        _, mid_col, _ = st.columns([1, 2, 1])
+        with mid_col:
+            admin_pw = st.text_input("관리자 비밀번호", type="password",
+                                     placeholder="비밀번호 입력",
+                                     label_visibility="collapsed",
+                                     key="admin_pw_input")
+            login_col, cancel_col = st.columns(2)
+            with login_col:
+                if st.button("로그인", key="admin_login_confirm", use_container_width=True):
+                    if admin_pw == admin1
+                        st.session_state["admin_mode"]       = True
+                        st.session_state["admin_show_login"] = False
+                        st.success("✅ 관리자 모드 활성화")
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 틀렸습니다.")
+            with cancel_col:
+                if st.button("취소", key="admin_login_cancel", use_container_width=True):
+                    st.session_state["admin_show_login"] = False
+                    st.rerun()
+    st.markdown("---")
+
+
+# ============================================================
+# ④ 관리자 패널 (관리자 모드 ON일 때만 표시)
+# ============================================================
+if st.session_state["admin_mode"]:
+    st.markdown("""
+    <div class="admin-panel">
+        <div class="admin-panel-title">
+            <div class="admin-panel-icon">🛡</div>
+            관리자 모드 — AI 재학습 키워드 관리
+            <span class="admin-badge-on" style="margin-left:auto;">🔓 ADMIN ON</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4 = st.tabs(
+        ["➕ 키워드 추가", "🗑 키워드 삭제", "📋 현재 키워드 목록", "📜 재학습 로그"])
+
+    # ── 탭1: 키워드 추가 ──
+    with adm_tab1:
+        st.markdown('<div class="admin-section">새 키워드 추가 → AI 분석에 즉시 반영</div>', unsafe_allow_html=True)
+
+        ac1, ac2 = st.columns([2, 1])
+        with ac1:
+            new_kw_input = st.text_input(
+                "추가할 키워드",
+                placeholder="예: 냄새나요  /  가성비 최고  /  다이소 쿠폰",
+                key="admin_new_kw"
+            )
+        with ac2:
+            kw_type_sel = st.selectbox(
+                "키워드 유형",
+                options=["neg", "pos", "promo", "exclude"],
+                format_func=lambda x: {
+                    "neg":     "🔴 부정 키워드",
+                    "pos":     "🟢 긍정 키워드",
+                    "promo":   "🟡 홍보 제외 키워드",
+                    "exclude": "⛔ 제목 직접 제외",
+                }[x],
+                key="admin_kw_type"
+            )
+
+        st.markdown("""
+        <div class="param-guide-box">
+            <b>🔴 부정 키워드</b> — 텍스트에 포함 시 부정 점수 가산 (룰베이스 × 0.8)<br>
+            <b>🟢 긍정 키워드</b> — 텍스트에 포함 시 긍정 점수 가산<br>
+            <b>🟡 홍보 제외</b> — 해당 키워드가 있고 부정어가 없으면 홍보성 글로 제외<br>
+            <b>⛔ 제목 직접 제외</b> — 제목에 이 키워드가 포함되면 수집 결과에서 완전 제외
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("✅ 키워드 추가 & AI 재학습 반영", key="admin_add_kw_btn", use_container_width=True):
+            ok, msg = admin_apply_keyword(kw_type_sel, new_kw_input, "add")
+            if ok:
+                st.success(f"✅ {msg}")
+                st.markdown('<span class="relearn-badge">🔄 AI 룰베이스 재학습 완료 — 다음 분석부터 적용됩니다</span>', unsafe_allow_html=True)
+            else:
+                st.warning(f"⚠ {msg}")
+
+    # ── 탭2: 키워드 삭제 ──
+    with adm_tab2:
+        st.markdown('<div class="admin-section">기존 키워드 삭제 → AI 분석에 즉시 반영</div>', unsafe_allow_html=True)
+
+        del_type = st.selectbox(
+            "삭제할 키워드 유형",
+            options=["neg", "pos", "promo", "exclude"],
+            format_func=lambda x: {
+                "neg":     "🔴 부정 키워드",
+                "pos":     "🟢 긍정 키워드",
+                "promo":   "🟡 홍보 제외 키워드",
+                "exclude": "⛔ 제목 직접 제외",
+            }[x],
+            key="admin_del_kw_type"
+        )
+
+        key_map_del = {
+            "neg":     "neg_kw_list",
+            "pos":     "pos_kw_list",
+            "promo":   "promo_kw_list",
+            "exclude": "exclude_title_kw_list",
+        }
+        kw_list_for_del = st.session_state[key_map_del[del_type]]
+
+        if kw_list_for_del:
+            del_target = st.selectbox(
+                "삭제할 키워드 선택",
+                options=kw_list_for_del,
+                key="admin_del_kw_target"
+            )
+            if st.button("🗑 선택 키워드 삭제", key="admin_del_kw_btn", use_container_width=True):
+                ok, msg = admin_apply_keyword(del_type, del_target, "remove")
+                if ok:
+                    st.success(f"✅ {msg}")
+                    st.markdown('<span class="relearn-badge">🔄 AI 룰베이스 재학습 완료</span>', unsafe_allow_html=True)
+                    st.rerun()
+                else:
+                    st.warning(f"⚠ {msg}")
+        else:
+            st.info("해당 유형에 등록된 키워드가 없습니다.")
+
+    # ── 탭3: 현재 키워드 목록 ──
+    with adm_tab3:
+        st.markdown('<div class="admin-section">현재 등록된 키워드 전체 목록</div>', unsafe_allow_html=True)
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**🔴 부정 키워드**")
+            neg_tags = "".join([f'<span class="admin-kw-tag">{k}</span>' for k in get_neg_kw()])
+            st.markdown(f'<div style="margin-bottom:1rem;">{neg_tags}</div>', unsafe_allow_html=True)
+
+            st.markdown("**🟢 긍정 키워드**")
+            pos_tags = "".join([f'<span class="admin-kw-tag" style="background:#F0FDF4;color:#16A34A;border-color:#A7F3D0;">{k}</span>' for k in get_pos_kw()])
+            st.markdown(f'<div style="margin-bottom:1rem;">{pos_tags}</div>', unsafe_allow_html=True)
+
+        with col_b:
+            st.markdown("**🟡 홍보 제외 키워드**")
+            promo_tags = "".join([f'<span class="admin-kw-tag" style="background:#FEFCE8;color:#CA8A04;border-color:#FDE68A;">{k}</span>' for k in get_promo_kw()])
+            st.markdown(f'<div style="margin-bottom:1rem;">{promo_tags}</div>', unsafe_allow_html=True)
+
+            st.markdown("**⛔ 제목 직접 제외 키워드**")
+            excl_tags = "".join([f'<span class="admin-kw-tag" style="background:#FEF2F2;color:#DC2626;border-color:#FCA5A5;">{k}</span>' for k in get_excl_kw()])
+            st.markdown(f'<div>{excl_tags if excl_tags else "<span style=\'color:#718096;font-size:0.82rem;\'>없음</span>"}</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # 통계
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        for col, label, count in [
+            (sc1, "부정 키워드", len(get_neg_kw())),
+            (sc2, "긍정 키워드", len(get_pos_kw())),
+            (sc3, "홍보 제외",   len(get_promo_kw())),
+            (sc4, "직접 제외",   len(get_excl_kw())),
+        ]:
+            with col:
+                st.markdown(f"""
+                <div class="admin-stat-box">
+                    <div class="admin-stat-num">{count}</div>
+                    <div class="admin-stat-label">{label}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # 초기화 버튼
+        st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
+        if st.button("🔄 전체 키워드 기본값으로 초기화", key="admin_reset_kw"):
+            st.session_state["neg_kw_list"]            = list(BASE_NEGATIVE_KW)
+            st.session_state["pos_kw_list"]            = list(BASE_POSITIVE_KW)
+            st.session_state["promo_kw_list"]          = list(BASE_PROMO_KW)
+            st.session_state["exclude_title_kw_list"]  = []
+            st.session_state["admin_retrain_log"].append({
+                "시각": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "내용": "[초기화] 전체 키워드를 기본값으로 리셋"
+            })
+            st.success("✅ 기본값으로 초기화 완료")
+            st.rerun()
+
+    # ── 탭4: 재학습 로그 ──
+    with adm_tab4:
+        st.markdown('<div class="admin-section">AI 룰베이스 재학습 변경 이력</div>', unsafe_allow_html=True)
+        log = st.session_state.get("admin_retrain_log", [])
+        if log:
+            log_df = pd.DataFrame(list(reversed(log)))
+            st.dataframe(log_df, use_container_width=True, hide_index=True, height=300)
+            log_csv = log_df.to_csv(index=False, encoding="utf-8-sig")
+            st.download_button("📥 로그 CSV 다운로드", log_csv.encode("utf-8-sig"),
+                               "admin_retrain_log.csv", "text/csv")
+        else:
+            st.info("아직 재학습 이력이 없습니다.")
+
+    st.markdown("---")
+
+
+# ============================================================
 # 앱 헤더
-# ============================
+# ============================================================
 st.markdown("""
 <div class="app-header">
     <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
@@ -771,9 +1187,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ============================
+# ============================================================
 # 사이드바
-# ============================
+# ============================================================
 with st.sidebar:
     st.markdown("""
     <div style="display:flex;align-items:center;gap:0.6rem;padding-bottom:1rem;border-bottom:1px solid #E2E8F0;margin-bottom:0.25rem;">
@@ -900,7 +1316,6 @@ with st.sidebar:
                                  help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록")
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
-    # ── [FIX 3] 감성 파라미터 기준 ──
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
@@ -922,17 +1337,18 @@ with st.sidebar:
         stop_btn = st.button("중지", use_container_width=True, key="stop_btn")
 
 
-# ============================
+# ============================================================
 # 분석 중지 처리
-# ============================
+# ============================================================
 if stop_btn:
     st.session_state["analysis_stopped"] = True
     st.warning("⏹ 분석이 중지되었습니다.")
     st.stop()
 
-# ============================
+
+# ============================================================
 # 분석 실행
-# ============================
+# ============================================================
 if run_btn:
     st.session_state["analysis_stopped"] = False
     keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:3]
@@ -949,7 +1365,7 @@ if run_btn:
 
     with st.spinner("AI 앙상블 모델 초기화 중... (Multilingual Sentiment + KLUE-RoBERTa)"):
         model_multi = load_multilingual()
-        model_r = load_roberta()
+        model_r     = load_roberta()
 
     # ── 수집 태스크 구성 ──
     collect_tasks = []
@@ -992,17 +1408,20 @@ if run_btn:
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
     # ── 다이소 관련성 필터 ──
-    # 카페/지식인은 검색어에 이미 "다이소"가 포함되어 있고,
-    # API 응답의 description이 짧아서 "다이소"가 잘릴 수 있으므로 필터 제외
-    before_rel = len(unique_items)
+    before_rel   = len(unique_items)
     unique_items = [it for it in unique_items
                     if it.get("출처") in ("카페", "지식인") or is_daiso_related(it)]
     rel_excluded = before_rel - len(unique_items)
 
-    # ── [FIX 1] 홍보성 글 제외 ──
-    before_promo = len(unique_items)
-    unique_items = [it for it in unique_items if not is_promotional(it)]
+    # ── 홍보성 글 제외 ──
+    before_promo  = len(unique_items)
+    unique_items  = [it for it in unique_items if not is_promotional(it)]
     promo_excluded = before_promo - len(unique_items)
+
+    # ── 관리자 제외 (URL + 제목 키워드) ──
+    before_admin  = len(unique_items)
+    unique_items  = [it for it in unique_items if not is_admin_excluded(it)]
+    admin_excluded = before_admin - len(unique_items)
 
     # ── 유심 관련 제외 ──
     USIM_EXCLUDE_KW = [
@@ -1013,8 +1432,8 @@ if run_btn:
         text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
         return any(kw.upper() in text for kw in USIM_EXCLUDE_KW)
 
-    before_usim  = len(unique_items)
-    unique_items = [it for it in unique_items if not is_usim_related(it)]
+    before_usim   = len(unique_items)
+    unique_items  = [it for it in unique_items if not is_usim_related(it)]
     usim_excluded = before_usim - len(unique_items)
 
     # ── 날짜 필터 ──
@@ -1024,9 +1443,10 @@ if run_btn:
 
     # ── 수집 완료 안내 ──
     notes = []
-    if rel_excluded > 0:    notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
-    if promo_excluded > 0:  notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
-    if usim_excluded > 0:   notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
+    if rel_excluded   > 0: notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
+    if promo_excluded > 0: notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
+    if admin_excluded > 0: notes.append(f"관리자 제외 <strong>{admin_excluded}</strong>건 제외")
+    if usim_excluded  > 0: notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
     note_str = " &nbsp;·&nbsp; ".join(notes)
     if note_str: note_str = " &nbsp;·&nbsp; " + note_str
 
@@ -1091,7 +1511,7 @@ if run_btn:
             else:
                 best  = max(votes, key=votes.get)
                 score = round(votes[best] / total_v * 100)
-                neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full)
+                neg_kw_cnt = sum(1 for kw in get_neg_kw() if kw in full)
                 if best == "부정" and not (multi_neg_score >= 0.35 or neg_kw_cnt >= 1):
                     best = "중립"; score = max(round(score * 0.7), 45)
                 sentiment = best
@@ -1099,7 +1519,7 @@ if run_btn:
             if score < threshold and sentiment != "중립":
                 sentiment = "중립"
 
-            date_str = item.get("날짜","") if src == "유튜브" else (lambda dt: dt.strftime("%Y-%m-%d") if dt else "")(parse_date(item))
+            date_str  = item.get("날짜","") if src == "유튜브" else (lambda dt: dt.strftime("%Y-%m-%d") if dt else "")(parse_date(item))
             prod_code = extract_product_code(full) if src != "유튜브" else ""
             prod_name = match_product_name(prod_code)
 
@@ -1157,7 +1577,6 @@ if run_btn:
     with tab_dash:
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
 
-        # ── 감성 필터 버튼 (긍정/부정 클릭 시 아래 내용 필터링) ──
         if "dash_filter" not in st.session_state:
             st.session_state["dash_filter"] = "전체"
 
@@ -1180,7 +1599,6 @@ if run_btn:
 
         st.markdown(f'<div style="font-size:0.78rem;color:#718096;margin:0.5rem 0;">현재 필터: <strong style="color:#0066CC;">{dash_filter}</strong> ({len(filtered_results)}건)</div>', unsafe_allow_html=True)
 
-        # ── 일자별 꺾은선 그래프 (긍정/부정 범례) ──
         if date_sent:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("📈")} <span style="font-size:0.95rem;font-weight:600;">일자별 감성 추이</span></div>', unsafe_allow_html=True)
             chart_rows = []
@@ -1201,7 +1619,6 @@ if run_btn:
                 .configure_axis(grid=True, gridColor="#F0F0F0", domain=False))
             st.altair_chart(chart, use_container_width=True)
 
-        # ── 소분류 / 품번 TOP 10 (필터 적용) ──
         filt_subs = []
         for r in filtered_results:
             if r.get("소분류"): filt_subs.extend([s.strip() for s in r["소분류"].split(",") if s.strip()])
@@ -1232,8 +1649,8 @@ if run_btn:
                 html2 += f'<div class="top-item"><div class="top-rank {cls}" style="color:{"#FFFFFF" if rank==1 else "var(--primary)"};">{rank}</div><div class="top-name">{name}</div><div class="top-count">{count}건</div></div>'
             st.markdown(f'<div class="card">{html2 or "<span style=\'color:#718096;font-size:0.82rem;\'>품번 데이터 없음</span>"}</div>', unsafe_allow_html=True)
 
-        # ── 원문 목록 + AI 요약 + 관리자 제외 기능 ──
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("📋")} <span style="font-size:0.95rem;font-weight:600;">{dash_filter} 글 목록 (원문 + AI 요약)</span></div>', unsafe_allow_html=True)
+        # ── 원문 목록 ──
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("📋")} <span style="font-size:0.95rem;font-weight:600;">{dash_filter} 글 목록</span></div>', unsafe_allow_html=True)
 
         if "excluded_items" not in st.session_state:
             st.session_state["excluded_items"] = {}
@@ -1250,11 +1667,10 @@ if run_btn:
                 _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
                 _title = r["title"] or "(제목 없음)"
 
-                # AI 요약 생성 (간단한 룰 기반 요약)
                 summary = ""
                 title_clean = clean_text(r.get("title",""))
-                neg_found = [kw for kw in NEGATIVE_KW if kw in title_clean]
-                pos_found = [kw for kw in POSITIVE_KW if kw in title_clean]
+                neg_found = [kw for kw in get_neg_kw() if kw in title_clean]
+                pos_found = [kw for kw in get_pos_kw() if kw in title_clean]
                 if r["감성"] == "부정" and neg_found:
                     summary = f"부정 키워드: {', '.join(neg_found[:3])} — 상품 품질/사용성 불만 가능성"
                 elif r["감성"] == "긍정" and pos_found:
@@ -1281,30 +1697,56 @@ if run_btn:
                     '</div>')
                 st.markdown(_html, unsafe_allow_html=True)
 
-                # 관리자 제외 기능
-                with st.expander(f"⚙ 이 글 제외하기 (#{idx+1})", expanded=False):
-                    reason = st.text_input("제외 사유", key=f"exclude_reason_{idx}", placeholder="예: 다이소와 무관한 글")
-                    if st.button("제외 확정", key=f"exclude_btn_{idx}"):
-                        if reason.strip():
-                            st.session_state["excluded_items"][item_key] = reason.strip()
-                            # 룰베이스 키워드에 추가 (학습)
-                            new_kw = reason.strip()
-                            if new_kw and new_kw not in PROMO_KW:
-                                PROMO_KW.append(new_kw)
-                            st.success(f"✅ 제외 완료. 사유: {reason}")
-                            st.rerun()
-                        else:
-                            st.warning("제외 사유를 입력해주세요.")
+                # ── 관리자 모드일 때만 제외 UI 표시 ──
+                if st.session_state["admin_mode"]:
+                    with st.expander(f"🛡 관리자: 이 글 제외하기 (#{idx+1})", expanded=False):
+                        excl_col1, excl_col2 = st.columns([3, 1])
+                        with excl_col1:
+                            reason = st.text_input(
+                                "제외 사유",
+                                key=f"exclude_reason_{idx}",
+                                placeholder="예: 무관한 글 · 스팸 · 홍보성"
+                            )
+                        with excl_col2:
+                            st.markdown("<div style='margin-top:1.6rem'></div>", unsafe_allow_html=True)
+                            if st.button("제외 확정", key=f"exclude_btn_{idx}", use_container_width=True):
+                                if reason.strip():
+                                    # URL 직접 제외 등록
+                                    st.session_state["admin_excluded_urls"][item_key] = reason.strip()
+                                    # 재학습 로그 기록
+                                    st.session_state["admin_retrain_log"].append({
+                                        "시각": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "내용": f"[URL제외] '{_title[:40]}' — 사유: {reason.strip()}"
+                                    })
+                                    st.success(f"✅ 제외 완료")
+                                    st.rerun()
+                                else:
+                                    st.warning("제외 사유를 입력해주세요.")
+
+                        # 제목 키워드 자동 학습 제안
+                        if reason and len(reason.strip()) >= 2:
+                            kw_suggest = reason.strip()
+                            st.markdown(f'<div style="font-size:0.75rem;color:#718096;margin-top:0.3rem;">💡 이 사유를 <b>⛔ 제목 직접 제외 키워드</b>로 등록하면 유사 글이 자동 필터링됩니다.</div>', unsafe_allow_html=True)
+                            if st.button(f"🔄 '{kw_suggest}' 키워드로 AI 재학습 반영", key=f"relearn_btn_{idx}"):
+                                ok, msg = admin_apply_keyword("exclude", kw_suggest, "add")
+                                if ok:
+                                    st.success(f"✅ AI 재학습 반영: {msg}")
+                                else:
+                                    st.info(f"ℹ {msg}")
         else:
             st.info(f"{dash_filter}으로 분류된 글이 없습니다.")
 
-        # ── 제외된 항목 관리 ──
-        if st.session_state.get("excluded_items"):
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("🚫")} <span style="font-size:0.95rem;font-weight:600;">제외된 항목 ({len(st.session_state["excluded_items"])}건)</span></div>', unsafe_allow_html=True)
-            st.markdown('<div class="card" style="font-size:0.8rem;">', unsafe_allow_html=True)
-            for link, reason in st.session_state["excluded_items"].items():
-                st.markdown(f'<div style="padding:0.3rem 0;border-bottom:1px solid #E2E8F0;">🔗 {link[:60]}... → 사유: <strong>{reason}</strong></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        # 제외된 항목 관리 (관리자 모드)
+        if st.session_state["admin_mode"] and st.session_state.get("admin_excluded_urls"):
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("🚫")} <span style="font-size:0.95rem;font-weight:600;">제외된 항목 ({len(st.session_state["admin_excluded_urls"])}건)</span></div>', unsafe_allow_html=True)
+            excl_df = pd.DataFrame([
+                {"URL": k[:60]+"...", "제외사유": v}
+                for k, v in st.session_state["admin_excluded_urls"].items()
+            ])
+            st.dataframe(excl_df, use_container_width=True, hide_index=True)
+            if st.button("🗑 제외 목록 초기화", key="clear_excl_urls"):
+                st.session_state["admin_excluded_urls"] = {}
+                st.rerun()
 
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("↓")} <span style="font-size:0.95rem;font-weight:600;">결과 다운로드</span></div>', unsafe_allow_html=True)
         dl1, dl2 = st.columns(2)
@@ -1394,7 +1836,6 @@ if run_btn:
 
     with tab_cafe:
         render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
-
 
     with tab_yt:
         yt_results = [r for r in results if r["출처"]=="유튜브"]
