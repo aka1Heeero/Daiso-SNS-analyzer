@@ -480,7 +480,14 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "admin1234")
+# ============================================================
+# ADMIN_PASSWORD — secrets 미설정 시 앱 강제 중단
+# ============================================================
+if "ADMIN_PASSWORD" not in st.secrets:
+    st.error("🚨 보안 오류: secrets에 ADMIN_PASSWORD가 설정되지 않았습니다. 관리자에게 문의하세요.")
+    st.stop()
+
+ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
 
 # ============================================================
 # API키
