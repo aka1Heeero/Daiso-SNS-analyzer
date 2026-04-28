@@ -102,8 +102,19 @@ html, body, .stApp {
 [data-testid="stSidebar"] [data-testid="stDateInput"] > label { display: none !important; }
 
 .date-label {
-    font-size: 0.7rem; color: #718096; margin-bottom: 1px;
-    margin-top: 0; display: block; line-height: 1.1;
+    font-size: 0.7rem; color: #718096;
+    margin: 0 0 -12px 0 !important;
+    display: block; line-height: 1.1;
+    padding: 0 !important;
+}
+/* date_input 위 자동 여백 제거 */
+[data-testid="stSidebar"] [data-testid="stDateInput"] {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+[data-testid="stSidebar"] .element-container:has([data-testid="stDateInput"]) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 [data-testid="stSidebar"] [data-testid="column"] {
@@ -113,6 +124,16 @@ html, body, .stApp {
 
 [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
     gap: 0.3rem !important;
+}
+/* 날짜 라벨과 입력칸 사이 Streamlit 자동 여백 제거 */
+[data-testid="stSidebar"] .element-container:has([data-testid="stDateInput"]) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+[data-testid="stSidebar"] .stMarkdown:has(div[style*="0.7rem"]) {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1 !important;
 }
 
 .app-header {
@@ -1374,10 +1395,10 @@ with st.sidebar:
 
     dc1, dc2 = st.columns(2, gap="small")
     with dc1:
-        st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.7rem;color:#718096;line-height:1.1;margin:0 0 2px 0;">시작일</div>', unsafe_allow_html=True)
         start_date = st.date_input("시작일", value=date(2026, 1, 1), label_visibility="collapsed", key="date_start")
     with dc2:
-        st.markdown('<span class="date-label">종료일</span>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.7rem;color:#718096;line-height:1.1;margin:0 0 2px 0;">종료일</div>', unsafe_allow_html=True)
         end_date = st.date_input("종료일", value=date.today(), label_visibility="collapsed", key="date_end")
 
     st.markdown("""
