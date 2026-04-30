@@ -6,6 +6,7 @@ import io
 import gspread
 import pandas as pd
 import altair as alt
+import concurrent.futures  # ✅ [수정 2] 파일 최상단으로 이동
 from datetime import datetime, date
 from google.oauth2.service_account import Credentials
 from transformers import pipeline
@@ -504,6 +505,15 @@ def load_roberta():
 
 
 # ============================
+# 텍스트 정제 (다른 함수보다 먼저 정의)
+# ============================
+def clean_text(text: str) -> str:
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'&[a-zA-Z]+;', ' ', text)
+    return text.strip()
+
+
+# ============================
 # 룰베이스 & 앙상블
 # ============================
 NEGATIVE_KW = [
@@ -534,7 +544,7 @@ PROMO_KW = [
     "홍보", "광고", "제품을 받았습니다", "제공받아", "협찬", "무료로 받",
     "내돈내산 아닌", "리뷰어", "체험단", "서포터즈", "내돈내산아님",
     "다이소 하울", "다이소 추천템", "다이소 인기템", "다이소 꿀템 추천",
-    "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천","매장 옆", "매장 근처", "매장 앞", "매장 뒤", "매장 주변",
+    "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천", "매장 옆", "매장 근처", "매장 앞", "매장 뒤", "매장 주변",
     "도전", "챌린지", "이벤트", "할인", "세일", "쿠폰", "프로모션", "특가"
 ]
 
@@ -549,11 +559,12 @@ def is_promotional(item: dict) -> bool:
     return False
 
 
+# ✅ [수정 4] LABEL_MAP 중복 키 제거
 LABEL_MAP = {
-    "positive":"긍정","pos":"긍정","LABEL_2":"긍정","긍정":"긍정",
-    "negative":"부정","neg":"부정","LABEL_0":"부정","부정":"부정",
-    "neutral":"중립","neu":"중립","LABEL_1":"중립","중립":"중립",
-    "부정":"부정","긍정":"긍정",
+    "positive": "긍정", "pos": "긍정", "LABEL_2": "긍정",
+    "negative": "부정", "neg": "부정", "LABEL_0": "부정",
+    "neutral":  "중립", "neu": "중립", "LABEL_1": "중립",
+    "긍정": "긍정", "부정": "부정", "중립": "중립",
 }
 
 def rule_based(text: str):
@@ -615,11 +626,6 @@ def build_naver_query(raw_keyword: str) -> str:
 # 네이버 블로그 수집 (페이징)
 # ============================
 def collect_naver_paged(query: str, search_type: str, total: int) -> list:
-    """
-    블로그(blog) 페이징 수집
-    start 최대 1000, 한 번에 최대 100건
-    ※ 지식인(kin) API는 날짜 범위 지정 파라미터가 없어 제외됨
-    """
     all_items = []
     per_page  = 100
     start_idx = 1
@@ -659,16 +665,8 @@ def collect_naver_paged(query: str, search_type: str, total: int) -> list:
 
 # ============================
 # 네이버 카페 수집 (페이징)
-# 카페글 API는 pubDate(RFC 2822) 날짜 필드를 반환하므로
-# 수집 후 filter_by_date()로 기간 필터링 적용
 # ============================
 def collect_cafe_paged(query: str, total: int) -> list:
-    """
-    카페(cafearticle) 페이징 수집
-    - API 응답의 pubDate(RFC 2822) 필드를 parse_date()로 파싱해 기간 필터 적용
-    - is_daiso_related()로 다이소 관련 글만 필터
-    - start 최대 1000
-    """
     all_items = []
     per_page  = 100
     start_idx = 1
@@ -694,8 +692,8 @@ def collect_cafe_paged(query: str, total: int) -> list:
             break
 
         for item in items:
-            item["출처"]   = "카페"
-            item["검색어"] = query
+            item["출처"]    = "카페"
+            item["검색어"]  = query
             item["channel"] = item.get("cafename", "")
 
         all_items.extend(items)
@@ -737,19 +735,23 @@ def search_youtube(query: str, max_results: int = 30) -> list:
         snippet = item.get("snippet", {})
         stats   = stats_map.get(vid_id, {})
         pub_raw = snippet.get("publishedAt", "")
-        try:   pub_dt = datetime.strptime(pub_raw[:10], "%Y-%m-%d"); pub_str = pub_dt.strftime("%Y-%m-%d")
-        except: pub_dt = None; pub_str = pub_raw[:10]
+        try:
+            pub_dt  = datetime.strptime(pub_raw[:10], "%Y-%m-%d")
+            pub_str = pub_dt.strftime("%Y-%m-%d")
+        except:
+            pub_dt  = None
+            pub_str = pub_raw[:10]
         results.append({
-            "출처":"유튜브","검색어":query,"video_id":vid_id,
-            "title":snippet.get("title",""),
-            "description":snippet.get("description","")[:300],
-            "channel":snippet.get("channelTitle",""),
-            "thumbnail":snippet.get("thumbnails",{}).get("medium",{}).get("url",""),
-            "link":f"https://www.youtube.com/watch?v={vid_id}",
-            "날짜":pub_str,"pub_dt":pub_dt,
-            "views":int(stats.get("viewCount",0) or 0),
-            "likes":int(stats.get("likeCount",0) or 0),
-            "comments":int(stats.get("commentCount",0) or 0),
+            "출처": "유튜브", "검색어": query, "video_id": vid_id,
+            "title": snippet.get("title", ""),
+            "description": snippet.get("description", "")[:300],
+            "channel": snippet.get("channelTitle", ""),
+            "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
+            "link": f"https://www.youtube.com/watch?v={vid_id}",
+            "날짜": pub_str, "pub_dt": pub_dt,
+            "views":    int(stats.get("viewCount",    0) or 0),
+            "likes":    int(stats.get("likeCount",    0) or 0),
+            "comments": int(stats.get("commentCount", 0) or 0),
         })
     return results
 
@@ -758,19 +760,27 @@ def search_youtube(query: str, max_results: int = 30) -> list:
 # 날짜 파싱 & 필터
 # ============================
 def parse_date(item: dict):
-    # 블로그: postdate (YYYYMMDD)
-    # 카페: pubDate (RFC 2822: "Mon, 01 Jan 2024 12:00:00 +0900")
+    """
+    블로그: postdate (YYYYMMDD)
+    카페:   pubDate  (RFC 2822 — "Mon, 01 Jan 2024 12:00:00 +0900")
+    """
     ds = item.get("postdate") or item.get("pubDate", "")
+    if not ds:
+        return None
     try:
-        if len(ds) == 8:
+        if len(ds) == 8 and ds.isdigit():
             return datetime.strptime(ds, "%Y%m%d")
-        # RFC 2822 형식
-        return datetime.strptime(ds[:25], "%a, %d %b %Y %H:%M:%S")
-    except:
-        try:
-            return datetime.strptime(ds[:16], "%a, %d %b %Y")
-        except:
-            return None
+    except Exception:
+        pass
+    # ✅ [수정 5] RFC 2822 파싱 — email.utils 사용으로 timezone 포함 포맷도 안전하게 처리
+    try:
+        from email.utils import parsedate
+        t = parsedate(ds)
+        if t:
+            return datetime(*t[:6])
+    except Exception:
+        pass
+    return None
 
 def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
     s = datetime(start_dt.year, start_dt.month, start_dt.day)
@@ -778,13 +788,9 @@ def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
     result = []
     for item in items:
         dt = item.get("pub_dt") if item.get("출처") == "유튜브" else parse_date(item)
-        if dt and s <= dt <= e: result.append(item)
+        if dt and s <= dt <= e:
+            result.append(item)
     return result
-
-def clean_text(text: str) -> str:
-    text = re.sub(r'<[^>]+>', '', text)
-    text = re.sub(r'&[a-zA-Z]+;', ' ', text)
-    return text.strip()
 
 
 # ============================
@@ -944,9 +950,6 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # ── ① 수집 채널 ──────────────────────────────────────
-    # [수정 1] 이미지 기준: 블로그↔카페 같은 행, 유튜브 단독 행 → 실제:블로그/카페 같은 행(좌우), 유튜브 단독
-    # 정확한 레이아웃: 블로그(좌) / 카페(우) 한 행, 유튜브 한 행
-    # 지식인은 날짜 범위 필터가 API 레벨에서 지원되지 않아 제외
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.4rem;">
         <div class="sb-section-icon">
@@ -980,7 +983,7 @@ with st.sidebar:
                 <span class="ch-label">카페</span>
             </div>""", unsafe_allow_html=True)
 
-   # 행2: 유튜브(좌) / 지식인 제외 안내(우)
+    # ✅ [수정 1] 행2: HTML 문자열 닫힘 누락 수정 — 닫는 """) 추가
     row2_left, row2_right = st.columns(2)
     with row2_left:
         cb_col3, icon_col3 = st.columns([1, 4])
@@ -999,8 +1002,7 @@ with st.sidebar:
         st.markdown("""<div class="ch-row" style="opacity:0.4;cursor:not-allowed;">
             <div style="width:20px;height:20px;border-radius:4px;background:#CBD5E1;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#FFFFFF;font-weight:900;flex-shrink:0;">N</div>
             <span style="font-size:0.82rem;font-weight:500;color:#718096;line-height:1;text-decoration:line-through;">지식인</span>
-        </div>
-      
+        </div>""", unsafe_allow_html=True)
 
     # ── ② 검색어 ────────────────────────────────────────────
     st.markdown("""
@@ -1062,7 +1064,7 @@ with st.sidebar:
     )
     st.markdown('<span class="sb-hint">데이터 수집건수 · 10 ~ 5,000</span>', unsafe_allow_html=True)
 
-    # ── ⑤ 부정 확신도 ───────────────────────────────────────
+    # ── ⑤ 감성 파라미터 ───────────────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
@@ -1079,7 +1081,7 @@ with st.sidebar:
         label_visibility="collapsed",
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
-    
+
     # ── ⑥ 감성 파라미터 안내 ────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
@@ -1095,7 +1097,7 @@ with st.sidebar:
         코드 내 <code>NEGATIVE_KW</code> 리스트에 단어를 추가하면 해당 단어가 포함된 글을 부정으로 가중처리합니다.<br><br>
         <b>📌 홍보성 글 제외</b><br>
         <code>PROMO_KW</code> 리스트에 단어 추가 시 홍보성으로 판단해 자동 제외합니다.<br><br>
-        <b>📌 현재 AI 모델 가중치 </b><br>
+        <b>📌 현재 AI 모델 가중치</b><br>
         • ELECTRA 가중치: <code>* 1.6</code> (현재)<br>
         • RoBERTa 가중치: <code>* 1.0</code> (현재)<br>
         • 룰베이스 가중치: <code>* 0.8</code> (현재)<br>
@@ -1124,17 +1126,18 @@ if run_btn:
         model_e = load_electra()
         model_r = load_roberta()
 
-    # ── 수집 태스크 구성 (지식인 제외) ───────────────────────
+    # ── 수집 태스크 구성 ───────────────────────
     collect_tasks = []
     for kw in keywords:
         if search_blog: collect_tasks.append(("blog", kw, "블로그"))
         if search_cafe: collect_tasks.append(("cafe", kw, "카페"))
         if search_yt and YOUTUBE_API_KEY:
-                        collect_tasks.append(("yt",   kw, "유튜브"))
+            collect_tasks.append(("yt", kw, "유튜브"))
 
     prog      = st.progress(0)
     prog_text = st.empty()
-    all_items = []; collect_log = []
+    all_items = []
+    collect_log = []
 
     def _fetch(task):
         tp, kw, label = task
@@ -1143,9 +1146,9 @@ if run_btn:
         if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
         return label, kw, []
 
-    import concurrent.futures
     total_tasks = len(collect_tasks)
     done = 0
+    # ✅ [수정 2] concurrent.futures는 이미 파일 상단에서 import
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(_fetch, t): t for t in collect_tasks}
         for fut in concurrent.futures.as_completed(futures):
@@ -1161,10 +1164,12 @@ if run_btn:
     # ── 중복 제거 ──────────────────────────────────────────────
     seen, unique_items = set(), []
     for item in all_items:
-        lnk = item.get("link","")
-        if lnk not in seen: seen.add(lnk); unique_items.append(item)
+        lnk = item.get("link", "")
+        if lnk not in seen:
+            seen.add(lnk)
+            unique_items.append(item)
 
-    # ── 다이소 관련성 필터 (카페는 쿼리에 다이소가 이미 포함되므로 통과) ──
+    # ── 다이소 관련성 필터 ──────────────────────────────────────
     before_rel = len(unique_items)
     unique_items = [
         it for it in unique_items
@@ -1177,11 +1182,11 @@ if run_btn:
     unique_items = [it for it in unique_items if not is_promotional(it)]
     promo_excluded = before_promo - len(unique_items)
 
-    # ── 관련 제외 키워드 필터 ─────────────────────────────────
+    # ── 유심 관련 제외 ─────────────────────────────────────────
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
         "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
-        "매장 옆","매장앞","매장 앞","매장 옆","옆 매장","옆가게","옆 매장",
+        "매장 옆","매장앞","매장 앞","옆 매장","옆가게",
         "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
         "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
         "다이소유심","다이소 유심","다이소심카드","다이소 심카드",
@@ -1190,8 +1195,8 @@ if run_btn:
         text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
         return any(kw.upper() in text for kw in USIM_EXCLUDE_KW)
 
-    before_usim  = len(unique_items)
-    unique_items = [it for it in unique_items if not is_usim_related(it)]
+    before_usim   = len(unique_items)
+    unique_items  = [it for it in unique_items if not is_usim_related(it)]
     usim_excluded = before_usim - len(unique_items)
 
     # ── 날짜 필터 ──────────────────────────────────────────────
@@ -1201,9 +1206,9 @@ if run_btn:
 
     # ── 수집 완료 안내 ─────────────────────────────────────────
     notes = []
-    if rel_excluded > 0:    notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
-    if promo_excluded > 0:  notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
-    if usim_excluded > 0:   notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
+    if rel_excluded > 0:   notes.append(f"다이소 무관 <strong>{rel_excluded}</strong>건 제외")
+    if promo_excluded > 0: notes.append(f"홍보성 글 <strong>{promo_excluded}</strong>건 제외")
+    if usim_excluded > 0:  notes.append(f"유심 관련 <strong>{usim_excluded}</strong>건 제외")
     note_str = " &nbsp;·&nbsp; ".join(notes)
     if note_str: note_str = " &nbsp;·&nbsp; " + note_str
 
@@ -1217,8 +1222,7 @@ if run_btn:
     """, unsafe_allow_html=True)
 
     # ── AI 분석 ────────────────────────────────────────────────
-    # [확인 4] 결과 dict에 소분류/품번/품명이 반드시 포함되도록 extract 함수 호출 확인
-    results = []
+    results      = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
 
@@ -1229,9 +1233,9 @@ if run_btn:
         batch = filtered[batch_start: batch_start + BATCH]
         texts, metas = [], []
         for item in batch:
-            src   = item.get("출처","")
-            title = clean_text(item.get("title",""))
-            desc  = clean_text(item.get("description",""))
+            src   = item.get("출처", "")
+            title = clean_text(item.get("title", ""))
+            desc  = clean_text(item.get("description", ""))
             full  = title + " " + desc
             texts.append(full)
             metas.append((src, item, title))
@@ -1274,33 +1278,32 @@ if run_btn:
             if score < threshold and sentiment != "중립":
                 sentiment = "중립"
 
-            date_str = item.get("날짜","") if src == "유튜브" else (
+            date_str = item.get("날짜", "") if src == "유튜브" else (
                 lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
             )(parse_date(item))
 
-            # [확인 4] 소분류/품번/품명 추출 — 유튜브 포함 모든 출처에서 full 텍스트 기준 추출
-            prod_code = extract_product_code(full)   # 출처 구분 없이 모든 채널 동일 적용
-            prod_name = match_product_name(prod_code)
-            subcategory = extract_subcategory(full)
+            prod_code     = extract_product_code(full)
+            prod_name     = match_product_name(prod_code)
+            subcategory   = extract_subcategory(full)
             price_mention = extract_price(full) if src != "유튜브" else ""
 
             results.append({
-                "출처":    src,
-                "검색어":  item.get("검색어",""),
-                "소분류":  subcategory,   # ← extract_subcategory(full) 결과
-                "품번":    prod_code,     # ← extract_product_code(full) 결과
-                "품명":    prod_name,     # ← match_product_name(prod_code) 결과
+                "출처":     src,
+                "검색어":   item.get("검색어", ""),
+                "소분류":   subcategory,
+                "품번":     prod_code,
+                "품명":     prod_name,
                 "가격언급": price_mention,
-                "title":  title,
-                "link":   item.get("link",""),
-                "날짜":   date_str,
-                "감성":   sentiment,
-                "확신도": score,
-                "channel": item.get("channel","") or item.get("cafename",""),
-                "views":   item.get("views",""),
-                "likes":   item.get("likes",""),
-                "comments":item.get("comments",""),
-                "video_id":item.get("video_id",""),
+                "title":    title,
+                "link":     item.get("link", ""),
+                "날짜":     date_str,
+                "감성":     sentiment,
+                "확신도":   score,
+                "channel":  item.get("channel", "") or item.get("cafename", ""),
+                "views":    item.get("views", ""),
+                "likes":    item.get("likes", ""),
+                "comments": item.get("comments", ""),
+                "video_id": item.get("video_id", ""),
             })
 
         done_so_far = min(batch_start + BATCH, total_f)
@@ -1312,15 +1315,15 @@ if run_btn:
 
     progress_bar.empty(); status_text.empty()
 
-    # ── 탭 렌더링 (지식인 탭 제거) ─────────────────────────────
+    # ── 탭 렌더링 ─────────────────────────────────────────────
     tab_dash, tab_blog, tab_cafe, tab_yt = st.tabs([
         "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"
     ])
 
     total = len(results)
-    pos   = sum(1 for r in results if r["감성"]=="긍정")
-    neg   = sum(1 for r in results if r["감성"]=="부정")
-    neu   = sum(1 for r in results if r["감성"]=="중립")
+    pos   = sum(1 for r in results if r["감성"] == "긍정")
+    neg   = sum(1 for r in results if r["감성"] == "부정")
+    neu   = sum(1 for r in results if r["감성"] == "중립")
 
     all_subs = []
     for r in results:
@@ -1345,10 +1348,10 @@ if run_btn:
         st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("↑")} <span style="font-size:0.95rem;font-weight:600;">분석 요약</span></div>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         for col, cls, lbl, val, pct, ic_txt in [
-            (c1,"total","전체 수집",  str(total), "100%",                                    "전체"),
-            (c2,"pos",  "긍정",      str(pos),   f"{round(pos/total*100) if total else 0}%","긍정"),
-            (c3,"neg",  "부정",      str(neg),   f"{round(neg/total*100) if total else 0}%","부정"),
-            (c4,"neu",  "중립",      str(neu),   f"{round(neu/total*100) if total else 0}%","중립"),
+            (c1,"total","전체 수집",  str(total), "100%",                                     "전체"),
+            (c2,"pos",  "긍정",       str(pos),   f"{round(pos/total*100) if total else 0}%", "긍정"),
+            (c3,"neg",  "부정",       str(neg),   f"{round(neg/total*100) if total else 0}%", "부정"),
+            (c4,"neu",  "중립",       str(neu),   f"{round(neu/total*100) if total else 0}%", "중립"),
         ]:
             with col:
                 st.markdown(f"""
@@ -1412,13 +1415,13 @@ if run_btn:
         neg_results = [r for r in results if r["감성"] == "부정"]
         if neg_results:
             for r in neg_results[:20]:
-                _b    = SENT_BADGE.get(r["감성"], "")
-                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
-                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
-                _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
+                _b     = SENT_BADGE.get(r["감성"], "")
+                _sub   = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code  = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _name  = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
                 _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
                 _title = r["title"] or "(제목 없음)"
-                _html  = (
+                st.markdown(
                     '<div class="result-card">'
                     '<div class="result-title">'
                     '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
@@ -1429,9 +1432,9 @@ if run_btn:
                     '<span>📅 ' + r["날짜"] + '</span>'
                     + _sub + _code + _name + _badge +
                     '</div>'
-                    '</div>'
+                    '</div>',
+                    unsafe_allow_html=True
                 )
-                st.markdown(_html, unsafe_allow_html=True)
         else:
             st.info("부정으로 분류된 글이 없습니다.")
 
@@ -1452,16 +1455,16 @@ if run_btn:
         if not src_results:
             st.info(f"{src_name} 수집 결과가 없습니다."); return
         t  = len(src_results)
-        p  = sum(1 for r in src_results if r["감성"]=="긍정")
-        n  = sum(1 for r in src_results if r["감성"]=="부정")
-        ne = sum(1 for r in src_results if r["감성"]=="중립")
+        p  = sum(1 for r in src_results if r["감성"] == "긍정")
+        n  = sum(1 for r in src_results if r["감성"] == "부정")
+        ne = sum(1 for r in src_results if r["감성"] == "중립")
 
-        c1,c2,c3,c4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4)
         for col, cls, lbl, val, ic_txt in [
             (c1,"total","전체",str(t),"전체"),
-            (c2,"pos","긍정",str(p),"긍정"),
-            (c3,"neg","부정",str(n),"부정"),
-            (c4,"neu","중립",str(ne),"중립"),
+            (c2,"pos",  "긍정",str(p),"긍정"),
+            (c3,"neg",  "부정",str(n),"부정"),
+            (c4,"neu",  "중립",str(ne),"중립"),
         ]:
             with col:
                 st.markdown(f"""
@@ -1477,7 +1480,7 @@ if run_btn:
 
         kw_stats = {}
         for r in src_results:
-            kw = r.get("검색어","")
+            kw = r.get("검색어", "")
             kw_stats.setdefault(kw, {"긍정":0,"부정":0,"중립":0})
             kw_stats[kw][r["감성"]] += 1
         kw_rows = []
@@ -1497,7 +1500,7 @@ if run_btn:
             _price = ('<span>💰 ' + r["가격언급"] + '</span>') if r.get("가격언급") else ""
             _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
             _title = r["title"] or "(제목 없음)"
-            _html  = (
+            st.markdown(
                 '<div class="result-card">'
                 '<div class="result-title">'
                 '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
@@ -1507,22 +1510,22 @@ if run_btn:
                 '<span>📅 ' + r["날짜"] + '</span>'
                 + _sub + _code + _name + _price + _badge +
                 '</div>'
-                '</div>'
+                '</div>',
+                unsafe_allow_html=True
             )
-            st.markdown(_html, unsafe_allow_html=True)
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
         st.download_button(f"📥 {src_name} CSV 다운로드", src_csv.encode("utf-8-sig"),
             f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
     with tab_blog:
-        render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
+        render_detail_tab([r for r in results if r["출처"] == "블로그"], "블로그")
 
     with tab_cafe:
-        render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
+        render_detail_tab([r for r in results if r["출처"] == "카페"], "카페")
 
     with tab_yt:
-        yt_results = [r for r in results if r["출처"]=="유튜브"]
+        yt_results = [r for r in results if r["출처"] == "유튜브"]
         if not yt_results:
             if not YOUTUBE_API_KEY:
                 st.warning("YOUTUBE_API_KEY가 secrets에 없습니다.")
@@ -1530,15 +1533,15 @@ if run_btn:
                 st.info("유튜브 수집 결과가 없습니다.")
         else:
             yt_t  = len(yt_results)
-            yt_p  = sum(1 for r in yt_results if r["감성"]=="긍정")
-            yt_n  = sum(1 for r in yt_results if r["감성"]=="부정")
-            yt_ne = sum(1 for r in yt_results if r["감성"]=="중립")
-            yc1,yc2,yc3,yc4 = st.columns(4)
+            yt_p  = sum(1 for r in yt_results if r["감성"] == "긍정")
+            yt_n  = sum(1 for r in yt_results if r["감성"] == "부정")
+            yt_ne = sum(1 for r in yt_results if r["감성"] == "중립")
+            yc1, yc2, yc3, yc4 = st.columns(4)
             for col, cls, lbl, val, ic_txt in [
                 (yc1,"total","영상",str(yt_t),"영상"),
-                (yc2,"pos","긍정",str(yt_p),"긍정"),
-                (yc3,"neg","부정",str(yt_n),"부정"),
-                (yc4,"neu","중립",str(yt_ne),"중립"),
+                (yc2,"pos",  "긍정",str(yt_p),"긍정"),
+                (yc3,"neg",  "부정",str(yt_n),"부정"),
+                (yc4,"neu",  "중립",str(yt_ne),"중립"),
             ]:
                 with col:
                     st.markdown(f"""
@@ -1552,10 +1555,10 @@ if run_btn:
 
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("영상")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 (조회수 순)</span></div>', unsafe_allow_html=True)
             for r in sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)[:20]:
-                b = SENT_BADGE.get(r["감성"],"")
-                views    = f"{r['views']:,}"    if isinstance(r.get("views"),int)    else "-"
-                likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),int)    else "-"
-                comments = f"{r['comments']:,}" if isinstance(r.get("comments"),int) else "-"
+                b        = SENT_BADGE.get(r["감성"], "")
+                views    = f"{r['views']:,}"    if isinstance(r.get("views"),    int) else "-"
+                likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),    int) else "-"
+                comments = f"{r['comments']:,}" if isinstance(r.get("comments"), int) else "-"
                 _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
                 _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
                 _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
