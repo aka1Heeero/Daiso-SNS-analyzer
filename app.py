@@ -810,7 +810,7 @@ def is_date_like(t):
     return bool(re.fullmatch(r'\d{6,8}', t.strip()))
 
 def extract_product_code(text):
-    raw_nums = re.findall(r'\b(\d{3,6})\b', text)
+    raw_nums = re.findall(r'\b(\d{4,9})\b', text)
     codes = []
     for c in raw_nums:
         if is_date_like(c):
