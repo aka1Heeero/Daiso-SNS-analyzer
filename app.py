@@ -980,7 +980,14 @@ with st.sidebar:
                 <span class="ch-label">카페</span>
             </div>""", unsafe_allow_html=True)
 
-   # 행2: 유튜브(좌) / 지식인 제외 안내(우)
+    # 카페 날짜 필터 안내 (카페 API는 pubDate 반환 → 수집 후 기간 필터링)
+    st.markdown("""
+    <span class="cafe-date-note">
+        ✅ 카페: <b>pubDate</b> 기준으로 지정 기간 필터링 적용
+    </span>
+    """, unsafe_allow_html=True)
+
+    # 행2: 유튜브(좌) / 지식인 제외 안내(우)
     row2_left, row2_right = st.columns(2)
     with row2_left:
         cb_col3, icon_col3 = st.columns([1, 4])
@@ -1000,7 +1007,8 @@ with st.sidebar:
             <div style="width:20px;height:20px;border-radius:4px;background:#CBD5E1;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#FFFFFF;font-weight:900;flex-shrink:0;">N</div>
             <span style="font-size:0.82rem;font-weight:500;color:#718096;line-height:1;text-decoration:line-through;">지식인</span>
         </div>
-      
+        <span style="font-size:0.62rem;color:#94A3B8;line-height:1.3;display:block;margin-top:2px;">날짜필터 미지원</span>
+        """, unsafe_allow_html=True)
 
     # ── ② 검색어 ────────────────────────────────────────────
     st.markdown("""
@@ -1071,7 +1079,7 @@ with st.sidebar:
                 <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
         </div>
-        <span class="sb-section-text">감성 파라미터</span>
+        <span class="sb-section-text">신뢰도 조정</span>
     </div>
     """, unsafe_allow_html=True)
     threshold = st.number_input(
@@ -1079,7 +1087,8 @@ with st.sidebar:
         label_visibility="collapsed",
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
-    
+    st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
+
     # ── ⑥ 감성 파라미터 안내 ────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
@@ -1087,7 +1096,8 @@ with st.sidebar:
         <span class="sb-section-text">감성 파라미터 가이드</span>
     </div>
     <div class="param-guide-box">
-        <b>📌 감성 파라미터 조정</b><br>
+        <b>📌 신뢰도(확신도) 조정</b><br>
+        위 <b>신뢰도 조정</b> 슬라이더가 핵심입니다.<br>
         • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
         • <code>55~65%</code> → 권장 (정확도 균형)<br>
         • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
@@ -1095,10 +1105,11 @@ with st.sidebar:
         코드 내 <code>NEGATIVE_KW</code> 리스트에 단어를 추가하면 해당 단어가 포함된 글을 부정으로 가중처리합니다.<br><br>
         <b>📌 홍보성 글 제외</b><br>
         <code>PROMO_KW</code> 리스트에 단어 추가 시 홍보성으로 판단해 자동 제외합니다.<br><br>
-        <b>📌 현재 AI 모델 가중치 </b><br>
+        <b>📌 AI 모델 가중치 변경</b><br>
         • ELECTRA 가중치: <code>* 1.6</code> (현재)<br>
         • RoBERTa 가중치: <code>* 1.0</code> (현재)<br>
         • 룰베이스 가중치: <code>* 0.8</code> (현재)<br>
+        숫자를 올리면 해당 모델의 영향력이 커집니다.
     </div>
     """, unsafe_allow_html=True)
 
