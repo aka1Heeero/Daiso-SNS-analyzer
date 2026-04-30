@@ -508,7 +508,7 @@ def is_date_like(t: str) -> bool:
     return False
 
 def extract_product_code(text: str) -> str:
-    raw_nums = re.findall(r'\b(\d{4,9})\b', text)
+    raw_nums = re.findall(r'\b(\d{5,9})\b', text)
     codes = []
     for c in raw_nums:
         if is_date_like(c): continue
