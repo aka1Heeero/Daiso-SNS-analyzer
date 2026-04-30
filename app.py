@@ -41,12 +41,15 @@ VALID_PRODUCT_CODES = set()
 if not PRODUCT_DB.empty and "품번" in PRODUCT_DB.columns:
     VALID_PRODUCT_CODES = set(PRODUCT_DB["품번"].dropna().astype(str).str.strip().tolist())
 
+EXCLUDE_SUBCATEGORIES = {"[자]", "[타]", "[기타]"}  # 제외할 목록
 
 def load_subcategories():
     if not PRODUCT_DB.empty and "소분류" in PRODUCT_DB.columns:
-        return list(PRODUCT_DB["소분류"].dropna().unique())
+        return [
+            s for s in PRODUCT_DB["소분류"].dropna().unique()
+            if not any(excl in str(s) for excl in EXCLUDE_SUBCATEGORIES)
+        ]
     return []
-
 
 SUBCATEGORIES = load_subcategories()
 
