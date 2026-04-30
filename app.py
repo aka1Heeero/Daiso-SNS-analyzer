@@ -79,7 +79,7 @@ html, body, .stApp {
     outline: none !important;
 }
 
-/* ── [FIX 4] 날짜 입력 간격 축소 ── */
+/* ── 날짜 입력 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
     background: var(--bg) !important;
     border: 1px solid var(--border) !important;
@@ -101,7 +101,6 @@ html, body, .stApp {
 [data-testid="stSidebar"] [data-testid="stDateInput"] > label {
     display: none !important;
 }
-/* [FIX 4] date-label 간격 최소화 */
 .date-label {
     font-size: 0.7rem;
     color: #718096;
@@ -110,7 +109,6 @@ html, body, .stApp {
     display: block;
     line-height: 1.1;
 }
-/* [FIX 4] date 컬럼 내부 gap 줄이기 */
 [data-testid="stSidebar"] [data-testid="column"] {
     gap: 0 !important;
     padding-top: 0 !important;
@@ -389,7 +387,7 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
     gap: 0 !important;
 }
 
-/* ── [FIX 3] 감성 파라미터 안내 박스 ── */
+/* ── 감성 파라미터 안내 박스 ── */
 .param-guide-box {
     background: #F0F7FF;
     border: 1.5px solid #B3D1F5;
@@ -405,6 +403,19 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
     background: #E8F1FB; color: #0052A3;
     border-radius: 4px; padding: 1px 5px;
     font-size: 0.74rem; font-family: monospace;
+}
+
+/* ── 카페 날짜 안내 뱃지 ── */
+.cafe-date-note {
+    background: #F0FDF4;
+    border: 1px solid #86EFAC;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.68rem;
+    color: #15803D;
+    margin-top: 0.25rem;
+    display: block;
+    line-height: 1.4;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -508,7 +519,6 @@ NEGATIVE_KW = [
     "사지마","사지 마","추천안","추천 안","별1","1개","뒤틀","휘어","금방망가",
     "금방 망가","오래못가","오래 못가","금방부서","금방 부서","변질","변질되","변질됐","부서지","부서졌","터지","터졌",
     "녹았","녹았어요","녹았네요","녹이 슬음","녹이 슬었","녹이 슬었어요","녹이 슬었네요","녹이 슨","녹이 슨거","녹이 슨것",
-
 ]
 POSITIVE_KW = [
     "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
@@ -517,9 +527,6 @@ POSITIVE_KW = [
     "지림","지려","감탄","감동","최적","최상의","맘에 쏙","맘에 들어","맘에 들었"
 ]
 
-# ============================
-# [FIX 1] 홍보성 글 제외 키워드
-# ============================
 PROMO_KW = [
     "다이소 매장", "다이소 오픈", "다이소 신상", "다이소 신제품", "다이소 근처",
     "다이소 위치", "다이소 영업시간", "다이소 매장 위치", "다이소 점포",
@@ -531,22 +538,12 @@ PROMO_KW = [
     "도전", "챌린지", "이벤트", "할인", "세일", "쿠폰", "프로모션", "특가"
 ]
 
-# ============================
-# [FIX 1] 홍보성 글 판단 함수
-# ============================
 def is_promotional(item: dict) -> bool:
-    """
-    제목+본문에 홍보성 키워드가 포함되어 있고,
-    부정 키워드가 1개도 없으면 홍보성 글로 판단해 제외.
-    """
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
     full  = title + " " + desc
-
     promo_hit = sum(1 for kw in PROMO_KW if kw in full)
     neg_hit   = sum(1 for kw in NEGATIVE_KW if kw in full)
-
-    # 홍보 키워드 1개 이상 + 부정 키워드 0개 → 홍보성으로 제외
     if promo_hit >= 1 and neg_hit == 0:
         return True
     return False
@@ -615,39 +612,21 @@ def build_naver_query(raw_keyword: str) -> str:
 
 
 # ============================
-# 네이버 검색 (블로그·지식인)
-# ============================
-def search_naver(query: str, search_type: str = "blog", display: int = 100) -> list:
-    url     = f"https://openapi.naver.com/v1/search/{search_type}.json"
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    params  = {"query": query, "display": min(display, 100), "sort": "date"}
-    try:
-        items = requests.get(url, headers=headers, params=params, timeout=10).json().get("items", [])
-    except Exception:
-        items = []
-    label = "블로그" if search_type == "blog" else "지식인"
-    for item in items: item["출처"] = label; item["검색어"] = query
-    return items
-
-
-# ============================
-# [FIX 2] 카페·지식인 페이징 수정
-# 네이버 API: cafearticle, kin 모두 /v1/search/{type}.json 동일 엔드포인트
-# start 파라미터 최대 1000까지 지원, display 최대 100
-# 카페는 cafename 필터 제거 → 다이소 관련 카페글 전체 수집 후 is_daiso_related로 필터
+# 네이버 블로그 수집 (페이징)
 # ============================
 def collect_naver_paged(query: str, search_type: str, total: int) -> list:
     """
-    블로그(blog) / 지식인(kin) 페이징 수집
+    블로그(blog) 페이징 수집
     start 최대 1000, 한 번에 최대 100건
+    ※ 지식인(kin) API는 날짜 범위 지정 파라미터가 없어 제외됨
     """
     all_items = []
     per_page  = 100
     start_idx = 1
-    label = "블로그" if search_type == "blog" else "지식인"
+    label = "블로그"
 
     while len(all_items) < total:
-        if start_idx > 1000:       # 네이버 API 하드 제한
+        if start_idx > 1000:
             break
         remaining = total - len(all_items)
         fetch_cnt = min(per_page, remaining, 1000 - start_idx + 1)
@@ -672,17 +651,22 @@ def collect_naver_paged(query: str, search_type: str, total: int) -> list:
         all_items.extend(items)
         start_idx += fetch_cnt
 
-        if len(items) < fetch_cnt:   # 결과가 더 이상 없음
+        if len(items) < fetch_cnt:
             break
 
     return all_items[:total]
 
 
+# ============================
+# 네이버 카페 수집 (페이징)
+# 카페글 API는 pubDate(RFC 2822) 날짜 필드를 반환하므로
+# 수집 후 filter_by_date()로 기간 필터링 적용
+# ============================
 def collect_cafe_paged(query: str, total: int) -> list:
     """
-    [FIX 2] 카페(cafearticle) 페이징 수집
-    - cafename 필터 제거: 다이소 공식 카페 외에도 다이소 관련 일반 카페글 모두 수집
-    - is_daiso_related()로 최종 필터링
+    카페(cafearticle) 페이징 수집
+    - API 응답의 pubDate(RFC 2822) 필드를 parse_date()로 파싱해 기간 필터 적용
+    - is_daiso_related()로 다이소 관련 글만 필터
     - start 최대 1000
     """
     all_items = []
@@ -712,7 +696,6 @@ def collect_cafe_paged(query: str, total: int) -> list:
         for item in items:
             item["출처"]   = "카페"
             item["검색어"] = query
-            # cafename이 있으면 channel로도 저장
             item["channel"] = item.get("cafename", "")
 
         all_items.extend(items)
@@ -775,11 +758,19 @@ def search_youtube(query: str, max_results: int = 30) -> list:
 # 날짜 파싱 & 필터
 # ============================
 def parse_date(item: dict):
+    # 블로그: postdate (YYYYMMDD)
+    # 카페: pubDate (RFC 2822: "Mon, 01 Jan 2024 12:00:00 +0900")
     ds = item.get("postdate") or item.get("pubDate", "")
     try:
-        if len(ds) == 8: return datetime.strptime(ds, "%Y%m%d")
-        return datetime.strptime(ds[:16], "%a, %d %b %Y")
-    except: return None
+        if len(ds) == 8:
+            return datetime.strptime(ds, "%Y%m%d")
+        # RFC 2822 형식
+        return datetime.strptime(ds[:25], "%a, %d %b %Y %H:%M:%S")
+    except:
+        try:
+            return datetime.strptime(ds[:16], "%a, %d %b %Y")
+        except:
+            return None
 
 def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
     s = datetime(start_dt.year, start_dt.month, start_dt.day)
@@ -930,7 +921,7 @@ st.markdown("""
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
         <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
-        <div class="header-sub">네이버 블로그 · 지식인 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa Collaboration</div>
+        <div class="header-sub">네이버 블로그 · 카페 · 유튜브 &nbsp;|&nbsp; KR-ELECTRA × KLUE-RoBERTa Collaboration</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -953,6 +944,9 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # ── ① 수집 채널 ──────────────────────────────────────
+    # [수정 1] 이미지 기준: 블로그↔카페 같은 행, 유튜브 단독 행 → 실제:블로그/카페 같은 행(좌우), 유튜브 단독
+    # 정확한 레이아웃: 블로그(좌) / 카페(우) 한 행, 유튜브 한 행
+    # 지식인은 날짜 범위 필터가 API 레벨에서 지원되지 않아 제외
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.4rem;">
         <div class="sb-section-icon">
@@ -964,9 +958,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    col_left, col_right = st.columns(2)
-
-    with col_left:
+    # 행1: 블로그(좌) / 카페(우)
+    row1_left, row1_right = st.columns(2)
+    with row1_left:
         cb_col, icon_col = st.columns([1, 4])
         with cb_col:
             search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
@@ -976,6 +970,7 @@ with st.sidebar:
                 <span class="ch-label">블로그</span>
             </div>""", unsafe_allow_html=True)
 
+    with row1_right:
         cb_col2, icon_col2 = st.columns([1, 4])
         with cb_col2:
             search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
@@ -985,26 +980,35 @@ with st.sidebar:
                 <span class="ch-label">카페</span>
             </div>""", unsafe_allow_html=True)
 
-    with col_right:
+    # 카페 날짜 필터 안내 (카페 API는 pubDate 반환 → 수집 후 기간 필터링)
+    st.markdown("""
+    <span class="cafe-date-note">
+        ✅ 카페: <b>pubDate</b> 기준으로 지정 기간 필터링 적용
+    </span>
+    """, unsafe_allow_html=True)
+
+    # 행2: 유튜브(좌) / 지식인 제외 안내(우)
+    row2_left, row2_right = st.columns(2)
+    with row2_left:
         cb_col3, icon_col3 = st.columns([1, 4])
         with cb_col3:
-            search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
-        with icon_col3:
-            st.markdown("""<div class="ch-row">
-                <div class="ch-icon ch-naver">N</div>
-                <span class="ch-label">지식인</span>
-            </div>""", unsafe_allow_html=True)
-
-        cb_col4, icon_col4 = st.columns([1, 4])
-        with cb_col4:
             search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
-        with icon_col4:
+        with icon_col3:
             st.markdown("""<div class="ch-row">
                 <div class="ch-icon ch-youtube">
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg>
                 </div>
                 <span class="ch-label">유튜브</span>
             </div>""", unsafe_allow_html=True)
+
+    with row2_right:
+        # 지식인: API 날짜 범위 미지원으로 제외, 비활성화 표시
+        st.markdown("""<div class="ch-row" style="opacity:0.4;cursor:not-allowed;">
+            <div style="width:20px;height:20px;border-radius:4px;background:#CBD5E1;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#FFFFFF;font-weight:900;flex-shrink:0;">N</div>
+            <span style="font-size:0.82rem;font-weight:500;color:#718096;line-height:1;text-decoration:line-through;">지식인</span>
+        </div>
+        <span style="font-size:0.62rem;color:#94A3B8;line-height:1.3;display:block;margin-top:2px;">날짜필터 미지원</span>
+        """, unsafe_allow_html=True)
 
     # ── ② 검색어 ────────────────────────────────────────────
     st.markdown("""
@@ -1038,7 +1042,6 @@ with st.sidebar:
 
     st.markdown('<div style="margin-top:0.6rem"></div>', unsafe_allow_html=True)
 
-    # [FIX 4] 날짜 간격 최소화: gap=0 스타일 컬럼 + margin 제거
     dc1, dc2 = st.columns(2, gap="small")
     with dc1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
@@ -1086,7 +1089,7 @@ with st.sidebar:
     )
     st.markdown('<span class="sb-hint">40~50% 민감 · 55~65% 권장 · 70%+ 엄격</span>', unsafe_allow_html=True)
 
-    # ── [FIX 3] 감성 파라미터 안내 ────────────────────────────
+    # ── ⑥ 감성 파라미터 안내 ────────────────────────────
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
@@ -1121,7 +1124,7 @@ if run_btn:
     keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:10]
     if not keywords_raw:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
-    if not any([search_blog, search_kin, search_cafe, search_yt]):
+    if not any([search_blog, search_cafe, search_yt]):
         st.error("채널을 하나 이상 선택해주세요."); st.stop()
     if start_date > end_date:
         st.error("시작일이 종료일보다 늦습니다. 날짜를 확인해주세요."); st.stop()
@@ -1132,11 +1135,10 @@ if run_btn:
         model_e = load_electra()
         model_r = load_roberta()
 
-    # ── 수집 태스크 구성 ──────────────────────────────────────
+    # ── 수집 태스크 구성 (지식인 제외) ───────────────────────
     collect_tasks = []
     for kw in keywords:
         if search_blog: collect_tasks.append(("blog", kw, "블로그"))
-        if search_kin:  collect_tasks.append(("kin",  kw, "지식인"))
         if search_cafe: collect_tasks.append(("cafe", kw, "카페"))
         if search_yt and YOUTUBE_API_KEY:
                         collect_tasks.append(("yt",   kw, "유튜브"))
@@ -1148,7 +1150,6 @@ if run_btn:
     def _fetch(task):
         tp, kw, label = task
         if tp == "blog": return label, kw, collect_naver_paged(kw, "blog", display_count)
-        if tp == "kin":  return label, kw, collect_naver_paged(kw, "kin",  display_count)
         if tp == "cafe": return label, kw, collect_cafe_paged(kw, display_count)
         if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
         return label, kw, []
@@ -1174,7 +1175,7 @@ if run_btn:
         lnk = item.get("link","")
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
-    # ── 다이소 관련성 필터 (카페는 제외 — 카페글은 이미 query에 다이소 포함) ──
+    # ── 다이소 관련성 필터 (카페는 쿼리에 다이소가 이미 포함되므로 통과) ──
     before_rel = len(unique_items)
     unique_items = [
         it for it in unique_items
@@ -1182,17 +1183,17 @@ if run_btn:
     ]
     rel_excluded = before_rel - len(unique_items)
 
-    # ── [FIX 1] 홍보성 글 제외 ─────────────────────────────────
+    # ── 홍보성 글 제외 ─────────────────────────────────────────
     before_promo = len(unique_items)
     unique_items = [it for it in unique_items if not is_promotional(it)]
     promo_excluded = before_promo - len(unique_items)
 
-    # ── 관련 제외 ─────────────────────────────────────────
+    # ── 관련 제외 키워드 필터 ─────────────────────────────────
     USIM_EXCLUDE_KW = [
         "유심","USIM","유심칩","유심카드","심카드","SIM카드",
-        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심","자","정력","정액","섹시"
+        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
         "매장 옆","매장앞","매장 앞","매장 옆","옆 매장","옆가게","옆 매장",
-        "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",,
+        "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
         "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
         "다이소유심","다이소 유심","다이소심카드","다이소 심카드",
     ]
@@ -1227,6 +1228,7 @@ if run_btn:
     """, unsafe_allow_html=True)
 
     # ── AI 분석 ────────────────────────────────────────────────
+    # [확인 4] 결과 dict에 소분류/품번/품명이 반드시 포함되도록 extract 함수 호출 확인
     results = []
     progress_bar = st.progress(0)
     status_text  = st.empty()
@@ -1287,20 +1289,29 @@ if run_btn:
                 lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
             )(parse_date(item))
 
-            prod_code = extract_product_code(full) if src != "유튜브" else ""
+            # [확인 4] 소분류/품번/품명 추출 — 유튜브 포함 모든 출처에서 full 텍스트 기준 추출
+            prod_code = extract_product_code(full)   # 출처 구분 없이 모든 채널 동일 적용
             prod_name = match_product_name(prod_code)
+            subcategory = extract_subcategory(full)
+            price_mention = extract_price(full) if src != "유튜브" else ""
 
             results.append({
-                "출처":    src, "검색어": item.get("검색어",""),
-                "소분류":  extract_subcategory(full),
-                "품번":    prod_code, "품명": prod_name,
-                "가격언급":extract_price(full) if src != "유튜브" else "",
-                "title":  title, "link": item.get("link",""),
-                "날짜":   date_str, "감성": sentiment,
+                "출처":    src,
+                "검색어":  item.get("검색어",""),
+                "소분류":  subcategory,   # ← extract_subcategory(full) 결과
+                "품번":    prod_code,     # ← extract_product_code(full) 결과
+                "품명":    prod_name,     # ← match_product_name(prod_code) 결과
+                "가격언급": price_mention,
+                "title":  title,
+                "link":   item.get("link",""),
+                "날짜":   date_str,
+                "감성":   sentiment,
                 "확신도": score,
-                "channel":item.get("channel","") or item.get("cafename",""),
-                "views":  item.get("views",""), "likes": item.get("likes",""),
-                "comments":item.get("comments",""), "video_id":item.get("video_id",""),
+                "channel": item.get("channel","") or item.get("cafename",""),
+                "views":   item.get("views",""),
+                "likes":   item.get("likes",""),
+                "comments":item.get("comments",""),
+                "video_id":item.get("video_id",""),
             })
 
         done_so_far = min(batch_start + BATCH, total_f)
@@ -1312,9 +1323,9 @@ if run_btn:
 
     progress_bar.empty(); status_text.empty()
 
-    # ── 탭 렌더링 ───────────────────────────────────────────────
-    tab_dash, tab_blog, tab_kin, tab_cafe, tab_yt = st.tabs([
-        "📊 대시보드", "📝 블로그", "💬 지식인", "☕ 카페", "▶ 유튜브"
+    # ── 탭 렌더링 (지식인 탭 제거) ─────────────────────────────
+    tab_dash, tab_blog, tab_cafe, tab_yt = st.tabs([
+        "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"
     ])
 
     total = len(results)
@@ -1415,6 +1426,7 @@ if run_btn:
                 _b    = SENT_BADGE.get(r["감성"], "")
                 _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
                 _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
                 _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
                 _title = r["title"] or "(제목 없음)"
                 _html  = (
@@ -1426,7 +1438,7 @@ if run_btn:
                     '<span>📍 ' + r["출처"] + '</span>'
                     '<span>🔍 ' + r["검색어"] + '</span>'
                     '<span>📅 ' + r["날짜"] + '</span>'
-                    + _sub + _code + _badge +
+                    + _sub + _code + _name + _badge +
                     '</div>'
                     '</div>'
                 )
@@ -1517,9 +1529,6 @@ if run_btn:
     with tab_blog:
         render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
 
-    with tab_kin:
-        render_detail_tab([r for r in results if r["출처"]=="지식인"], "지식인")
-
     with tab_cafe:
         render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
 
@@ -1558,6 +1567,9 @@ if run_btn:
                 views    = f"{r['views']:,}"    if isinstance(r.get("views"),int)    else "-"
                 likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),int)    else "-"
                 comments = f"{r['comments']:,}" if isinstance(r.get("comments"),int) else "-"
+                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
                 st.markdown(f"""
                 <div class="result-card">
                     <div class="result-title">
@@ -1569,6 +1581,7 @@ if run_btn:
                         <span>▶ {views}</span>
                         <span>♥ {likes}</span>
                         <span>💬 {comments}</span>
+                        {_sub}{_code}{_name}
                         <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
