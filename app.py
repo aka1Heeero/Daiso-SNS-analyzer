@@ -101,6 +101,7 @@ html, body, .stApp {
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] > label { display: none !important; }
 
+/* ── FIX: 날짜 라벨-입력 간격 제거 ── */
 .date-label {
     font-size: 0.7rem; color: #718096;
     margin: 0 0 2px 0 !important;
@@ -229,7 +230,7 @@ html, body, .stApp {
 /* ── 사이드바 분석 버튼: 노란 굵은 텍스트 ── */
 [data-testid="stSidebar"] .stButton > button {
     background: var(--primary) !important;
-    color: #FFD000 !important;
+    color: #FFD600 !important;
     font-size: 1rem !important;
     font-weight: 800 !important;
     border: none !important;
@@ -421,7 +422,7 @@ def check_password():
     <div class="login-wrap">
         <div class="login-icon">🔵</div>
         <div class="login-title">DAISO SNS ISSUE FINDER</div>
-        <div class="login-sub">다이소 SNS 고객불만관리 AI시스템</div>
+        <div class="login-sub">다이소 SNS 상품불량 수집 AI시스템</div>
     </div>
     """, unsafe_allow_html=True)
     col = st.columns([1, 2, 1])[1]
@@ -432,7 +433,7 @@ def check_password():
                 st.session_state.authenticated = True
                 st.rerun()
             else:
-                st.error("비밀번호가 올바르지 않습니다. 데이터분석팀에 문의하세요")
+                st.error("비밀번호가 올바르지 않습니다.")
     return False
 
 if not check_password():
