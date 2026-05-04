@@ -189,11 +189,14 @@ html, body, .stApp {
 .stDataFrame { border-radius: 10px !important; overflow: hidden !important; }
 .stAlert { border-radius: 8px !important; }
 hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 0 !important; }
-#MainMenu, footer, header { visibility: hidden; }
-header { visibility: hidden; }
+#MainMenu, footer {
+    visibility: hidden;
+}
+
 [data-testid="collapsedControl"] {
     visibility: visible !important;
     display: flex !important;
+}
 
 .badge-coming { display: inline-flex; align-items: center; gap: 0.3rem; background: #F1F5F9; color: #64748B; border: 1px dashed #CBD5E1; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 500; }
 
