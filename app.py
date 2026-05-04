@@ -1266,17 +1266,17 @@ with st.sidebar:
     col_left, col_right = st.columns(2)
     with col_left:
         cb1, ic1 = st.columns([1,4])
-        with cb1: search_blog = st.checkbox("", value=True, key="cb_blog", label_visibility="collapsed")
+        with cb1: search_blog = st.checkbox("블로그", value=True, key="cb_blog", label_visibility="collapsed")
         with ic1: st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">블로그</span></div>', unsafe_allow_html=True)
         cb2, ic2 = st.columns([1,4])
-        with cb2: search_cafe = st.checkbox("", value=True, key="cb_cafe", label_visibility="collapsed")
+        with cb2: search_cafe = st.checkbox("카페", value=True, key="cb_cafe", label_visibility="collapsed")
         with ic2: st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">카페</span></div>', unsafe_allow_html=True)
     with col_right:
         cb3, ic3 = st.columns([1,4])
-        with cb3: search_kin = st.checkbox("", value=True, key="cb_kin", label_visibility="collapsed")
+        with cb3: search_kin = st.checkbox("지식인", value=True, key="cb_kin", label_visibility="collapsed")
         with ic3: st.markdown('<div class="ch-row"><div class="ch-icon ch-naver">N</div><span class="ch-label">지식인</span></div>', unsafe_allow_html=True)
         cb4, ic4 = st.columns([1,4])
-        with cb4: search_yt = st.checkbox("", value=True, key="cb_yt", label_visibility="collapsed")
+        with cb4: search_yt = st.checkbox("유튜브", value=True, key="cb_yt", label_visibility="collapsed")
         with ic4: st.markdown('<div class="ch-row"><div class="ch-icon ch-youtube"><svg width="9" height="9" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="5,3 19,12 5,21"/></svg></div><span class="ch-label">유튜브</span></div>', unsafe_allow_html=True)
 
     # ── 검색어 ──
@@ -1299,7 +1299,7 @@ with st.sidebar:
 
     # ── 수집 개수 ──
     st.markdown("""<div class="sb-section" style="margin:0.5rem 0 0.3rem;"><div class="sb-section-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><span class="sb-section-text">분석개수</span></div>""", unsafe_allow_html=True)
-    display_count = st.number_input("", min_value=100, max_value=5000, value=100, step=100, label_visibility="collapsed")
+    display_count = st.number_input("감성 판단 기준", min_value=100, max_value=5000, value=100, step=100, label_visibility="collapsed")
     st.markdown('<span class="sb-hint">데이터 수집건수 · 100 ~ 5,000 (±100)</span>', unsafe_allow_html=True)
 
     # ── 감성 파라미터 ──
@@ -1429,7 +1429,7 @@ if run_btn:
 
     results = []
     progress_bar = st.progress(0); status_text = st.empty()
-    BATCH = 32; total_f = len(filtered)
+    BATCH = 8; total_f = len(filtered)
 
     for batch_start in range(0, total_f, BATCH):
         if st.session_state.get("analysis_stopped"): break
