@@ -363,7 +363,8 @@ html, body, .stApp {
 .stDataFrame { border-radius: 10px !important; overflow: hidden !important; }
 .stAlert { border-radius: 8px !important; }
 hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 0 !important; }
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden; }
+[data-testid="collapsedControl"] { visibility: visible !important; display: block !important; }
 
 .badge-coming {
     display: inline-flex; align-items: center; gap: 0.3rem;
