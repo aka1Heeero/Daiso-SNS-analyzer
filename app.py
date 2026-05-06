@@ -401,7 +401,6 @@ PROMO_KW = list(set([
     "다이소 하울","다이소 추천템","다이소 인기템","다이소 꿀템 추천",
     "다이소 추천 아이템","다이소 베스트","다이소 신상품 추천",
     "매장 옆","매장 근처","매장 앞","매장 뒤","매장 주변",
-    "도전","챌린지","이벤트","할인","세일","쿠폰","프로모션","특가",
 ] + _sheet_kw.get("promo", [])))
 
 PROMO_PATTERNS = [
@@ -409,7 +408,7 @@ PROMO_PATTERNS = [
     r"소정의\s*원고료", r"원고료.*지급", r"광고.*포함",
     r"링크.*통해.*구매", r"할인\s*코드", r"쿠폰\s*코드",
 ]
-TITLE_PROMO_KW = ["추천","하울","꿀템","인생템","갓성비","득템","베스트","추천템"]
+TITLE_PROMO_KW = ["하울","꿀템","인생템","갓성비","득템"]
 SHEET_EXCLUDE_KW = _sheet_kw.get("exclude", [])
 
 USIM_EXCLUDE_KW = [
@@ -1177,8 +1176,13 @@ if run_btn:
             unique_items.append(item)
 
     # 필터링 (순서 중요)
+    # 네이버 블로그/카페는 쿼리 자체에 "다이소"를 포함해 검색하므로
+    # is_daiso_related 검사를 면제 → 유튜브만 제목/설명 기반으로 필터
     before_rel   = len(unique_items)
-    unique_items = [it for it in unique_items if it.get("출처") in ("블로그", "카페") or is_daiso_related(it)]
+    unique_items = [
+        it for it in unique_items
+        if it.get("출처") in ("블로그", "카페") or is_daiso_related(it)
+    ]
     rel_excluded = before_rel - len(unique_items)
 
     before_promo  = len(unique_items)
