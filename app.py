@@ -1177,9 +1177,9 @@ if run_btn:
             unique_items.append(item)
 
     # 필터링 (순서 중요)
-    before_rel    = len(unique_items)
-    unique_items  = [it for it in unique_items if it.get("출처") == "카페" or is_daiso_related(it)]
-    rel_excluded  = before_rel - len(unique_items)
+    before_rel   = len(unique_items)
+    unique_items = [it for it in unique_items if it.get("출처") in ("블로그", "카페") or is_daiso_related(it)]
+    rel_excluded = before_rel - len(unique_items)
 
     before_promo  = len(unique_items)
     unique_items  = [it for it in unique_items if not is_promotional(it)]
