@@ -493,12 +493,12 @@ def load_keywords_from_sheet():
     try:
         gc = _get_gspread_client()
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("keyword")
+        ws = sh.worksheet("keywords")
         rows = ws.get_all_records()
         result = {"neg": [], "pos": [], "promo": [], "exclude": []}
         for r in rows:
             t = r.get("type", "").strip().lower()
-            kw = r.get("keyword", "").strip()
+            kw = r.get("keywords", "").strip()
             if t in result and kw:
                 result[t].append(kw)
         return result
@@ -512,11 +512,11 @@ def load_excluded_urls_from_sheet():
     try:
         gc = _get_gspread_client()
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("exclude_urls")
+        ws = sh.worksheet("excluded_urls")
         rows = ws.get_all_records()
         return {r.get("url", "").strip() for r in rows if r.get("url", "").strip()}
     except Exception as e:
-        st.warning(f"⚠ exclude_urls 시트 로드 실패: {e}")
+        st.warning(f"⚠ excluded_urls 시트 로드 실패: {e}")
         return set()
 
 def append_keyword_to_sheet(kw_type, keyword):
@@ -524,7 +524,7 @@ def append_keyword_to_sheet(kw_type, keyword):
     try:
         gc = _get_gspread_client(readonly=False)
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("keyword")
+        ws = sh.worksheet("keywords")
         ws.append_row([kw_type, keyword, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         load_keywords_from_sheet.clear()
     except Exception as e:
@@ -535,7 +535,7 @@ def append_excluded_url_to_sheet(url, reason="관리자 제외"):
     try:
         gc = _get_gspread_client(readonly=False)
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("exclude_urls")
+        ws = sh.worksheet("excluded_urls")
         ws.append_row([url, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         load_excluded_urls_from_sheet.clear()
     except Exception as e:
