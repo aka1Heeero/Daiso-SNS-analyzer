@@ -1474,18 +1474,17 @@ if run_btn:
     st.session_state["analysis_start_date"] = start_date
     st.session_state["analysis_end_date"] = end_date
 
-# ── 결과가 session_state에 있으면 항상 탭 렌더링 ──
+    # ── 결과가 session_state에 있으면 항상 탭 렌더링 ──
     if "analysis_results" in st.session_state and st.session_state["analysis_results"]:
-    results    = st.session_state["analysis_results"]
-    start_date = st.session_state["analysis_start_date"]
-    end_date   = st.session_state["analysis_end_date"]
-        "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"
-    ])
+        results    = st.session_state["analysis_results"]
+        start_date = st.session_state["analysis_start_date"]
+        end_date   = st.session_state["analysis_end_date"]
+        "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"]
 
-    total = len(results)
-    pos   = sum(1 for r in results if r["감성"]=="긍정")
-    neg   = sum(1 for r in results if r["감성"]=="부정")
-    neu   = sum(1 for r in results if r["감성"]=="중립")
+        total = len(results)
+        pos   = sum(1 for r in results if r["감성"]=="긍정")
+        neg   = sum(1 for r in results if r["감성"]=="부정")
+        neu   = sum(1 for r in results if r["감성"]=="중립")
 
     all_subs = []
     for r in results:
