@@ -669,8 +669,6 @@ def rule_based(text: str):
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
 def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
-        return "긍정", 70
-
     votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
 
     roberta_neg_prob = 0.0
