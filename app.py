@@ -1050,8 +1050,6 @@ if st.session_state["admin_show_login"] and not st.session_state["admin_mode"]:
             with lc:
                 if st.button("로그인", key="admin_login_confirm", use_container_width=True):
                     _admin_enter()
-                    if st.session_state.get("admin_mode"):
-                        st.rerun()
             with cc:
                 if st.button("취소", key="admin_login_cancel", use_container_width=True):
                     st.session_state["admin_show_login"] = False
