@@ -202,7 +202,7 @@ html, body, .stApp {
 .badge-pos { background: var(--pos-bg); color: var(--pos); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neg { background: var(--neg-bg); color: var(--neg); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 .badge-neu { background: var(--neu-bg); color: var(--neu); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
-
+.badge-sub { background: var(--primary-lt); color: var(--primary); padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 /* ── TOP 아이템 ── */
 .top-item {
     display: flex; align-items: center; gap: 0.75rem;
@@ -328,6 +328,16 @@ html, body, .stApp {
     box-shadow: 0 4px 14px rgba(255,214,0,0.5) !important;
     color: #1A202C !important;
 }
+[data-testid="stSidebar"] [data-testid="column"]:last-child .stButton > button {
+    background: #E2E8F0 !important;
+    color: #DC2626 !important;
+    font-weight: 700 !important;
+    box-shadow: none !important;
+}
+[data-testid="stSidebar"] [data-testid="column"]:last-child .stButton > button:hover {
+    background: #FEE2E2 !important;
+    color: #DC2626 !important;
+}
 
 .stDownloadButton > button {
     background: var(--bg-white) !important; color: var(--primary) !important;
@@ -418,6 +428,14 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
     display: block;
     line-height: 1.4;
 }
+
+/* ── 관리자 모드 ── */
+.admin-badge-on {
+    background: #7C3AED; color: #fff; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.7rem; font-weight: 700;
+}
+.admin-login-modal { text-align: center; padding: 1.5rem 0 0.5rem; }
+.admin-login-icon { font-size: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -451,6 +469,81 @@ if not check_password():
 NAVER_CLIENT_ID     = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
+ADMIN_PASSWORD      = st.secrets.get("ADMIN_PASSWORD", "admin1234")
+
+# ============================================== 관리자 모드 세션 초기화
+for _k, _v in {"admin_mode": False, "admin_show_login": False, "admin_exclude_kws": []}.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
+
+
+# ============================================== 구글시트 연동 (keyword / exclude_urls)
+SHEET_ID = "1iZS_bBlmZaMRFfW-l6XTP5zUZzit3vxhSIogEB-ynDM"
+
+def _get_gspread_client(readonly=True):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"] if readonly else [
+        "https://www.googleapis.com/auth/spreadsheets"
+    ]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+    return gspread.authorize(creds)
+
+@st.cache_data(ttl=600)
+def load_keywords_from_sheet():
+    """구글시트 [keyword] 탭에서 neg/pos/promo/exclude 키워드 로드."""
+    try:
+        gc = _get_gspread_client()
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("keyword")
+        rows = ws.get_all_records()
+        result = {"neg": [], "pos": [], "promo": [], "exclude": []}
+        for r in rows:
+            t = r.get("type", "").strip().lower()
+            kw = r.get("keyword", "").strip()
+            if t in result and kw:
+                result[t].append(kw)
+        return result
+    except Exception as e:
+        st.warning(f"⚠ keyword 시트 로드 실패: {e}")
+        return {"neg": [], "pos": [], "promo": [], "exclude": []}
+
+@st.cache_data(ttl=600)
+def load_excluded_urls_from_sheet():
+    """구글시트 [exclude_urls] 탭에서 제외 URL 목록 로드."""
+    try:
+        gc = _get_gspread_client()
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("exclude_urls")
+        rows = ws.get_all_records()
+        return {r.get("url", "").strip() for r in rows if r.get("url", "").strip()}
+    except Exception as e:
+        st.warning(f"⚠ exclude_urls 시트 로드 실패: {e}")
+        return set()
+
+def append_keyword_to_sheet(kw_type, keyword):
+    """구글시트 [keyword] 탭에 키워드 추가."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("keyword")
+        ws.append_row([kw_type, keyword, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        load_keywords_from_sheet.clear()
+    except Exception as e:
+        st.error(f"시트 저장 실패: {e}")
+
+def append_excluded_url_to_sheet(url, reason="관리자 제외"):
+    """구글시트 [exclude_urls] 탭에 URL 추가."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("exclude_urls")
+        ws.append_row([url, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        load_excluded_urls_from_sheet.clear()
+    except Exception as e:
+        st.error(f"시트 저장 실패: {e}")
+
+# 시트에서 키워드 로드
+_sheet_kw = load_keywords_from_sheet()
+EXCLUDED_URLS_FROM_SHEET = load_excluded_urls_from_sheet()
 
 
 # ============================================== 구글시트 불러오기 (품번,품명,소분류)
@@ -485,6 +578,8 @@ def load_subcategories():
 
 SUBCATEGORIES = load_subcategories()
 
+# ── 제외할 소분류 (직접 수정) ──
+EXCLUDE_SUBCATEGORIES = ["차","자"]
 
 # ============================================== AI모델링 (KLUE-RoBERTa + 룰베이스)
 @st.cache_resource
@@ -531,15 +626,33 @@ PROMO_KW = [
     "도전", "챌린지", "이벤트", "할인", "세일", "쿠폰", "프로모션", "특가"
 ]
 
+PROMO_PATTERNS = [
+    r"제공.{0,5}받", r"협찬", r"체험단", r"서포터즈",
+    r"소정의\s*원고료", r"원고료.*지급", r"광고.*포함",
+    r"링크.*통해.*구매", r"할인\s*코드", r"쿠폰\s*코드",
+]
+
+TITLE_PROMO_KW = ["추천", "하울", "꿀템", "인생템", "갓성비", "득템", "베스트", "추천템"]
+
+# 구글시트 키워드 병합
+NEGATIVE_KW = list(set(NEGATIVE_KW + _sheet_kw.get("neg", [])))
+POSITIVE_KW = list(set(POSITIVE_KW + _sheet_kw.get("pos", [])))
+PROMO_KW    = list(set(PROMO_KW + _sheet_kw.get("promo", [])))
+SHEET_EXCLUDE_KW = _sheet_kw.get("exclude", [])
+
 def is_promotional(item: dict) -> bool:
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
     full  = title + " " + desc
     promo_hit = sum(1 for kw in PROMO_KW if kw in full)
-    neg_hit   = sum(1 for kw in NEGATIVE_KW if kw in full)
-    if promo_hit >= 1 and neg_hit == 0:
+    pattern_hit = sum(1 for p in PROMO_PATTERNS if re.search(p, full))
+    neg_hit = sum(1 for kw in NEGATIVE_KW if kw in full)
+    title_promo = sum(1 for kw in TITLE_PROMO_KW if kw in title)
+    if (promo_hit >= 1 or pattern_hit >= 1 or title_promo >= 1) and neg_hit <= 1:
         return True
     return False
+
+
 
 
 LABEL_MAP = {
@@ -555,8 +668,9 @@ def rule_based(text: str):
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
-
 def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
+        return "긍정", 70
+
     votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
 
     roberta_neg_prob = 0.0
@@ -591,7 +705,6 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
         return "중립", max(score - 10, 40)
 
     return best, score
-
 
 # ============================
 # 다이소 관련성 필터
@@ -787,6 +900,15 @@ def clean_text(text: str) -> str:
     text = re.sub(r'&[a-zA-Z]+;', ' ', text)
     return text.strip()
 
+def is_admin_excluded(item):
+    """관리자 제외: 세션 키워드 + 시트 exclude 키워드 + 시트 exclude URL."""
+    url = item.get("link", "")
+    if url in EXCLUDED_URLS_FROM_SHEET:
+        return True
+    full = clean_text(item.get("title","")) + " " + clean_text(item.get("description",""))
+    all_exclude_kws = st.session_state.get("admin_exclude_kws", []) + SHEET_EXCLUDE_KW
+    return any(kw in full for kw in all_exclude_kws)
+
 
 # ============================
 # 품번 추출
@@ -799,10 +921,10 @@ DATE_PATS = [
 def is_date_like(t):
     for p in DATE_PATS:
         if re.fullmatch(p, t.strip()): return True
-    return bool(re.fullmatch(r'\d{6,8}', t.strip()))
+    return bool(re.fullmatch(r'20\d{6}', t.strip()))
 
 def extract_product_code(text):
-    raw_nums = re.findall(r'\b(\d{4,9})\b', text)
+    raw_nums = re.findall(r'\b(\d{4,11})\b', text)
     codes = []
     for c in raw_nums:
         if is_date_like(c):
@@ -888,6 +1010,60 @@ def fmt_score(score) -> str:
     except:
         return f"{score}%"
 
+
+# ============================
+# 관리자 모드 버튼 & 로그인
+# ============================
+admin_col1, admin_col2 = st.columns([10, 1])
+with admin_col2:
+    if st.session_state["admin_mode"]:
+        if st.button("🔓 관리자", key="admin_toggle_off"):
+            st.session_state["admin_mode"] = False
+            st.session_state["admin_show_login"] = False
+            st.rerun()
+        st.markdown('<span class="admin-badge-on">🔓 ADMIN</span>', unsafe_allow_html=True)
+    else:
+        if st.button("🔐 관리자", key="admin_toggle_on"):
+            st.session_state["admin_show_login"] = not st.session_state["admin_show_login"]
+            st.rerun()
+
+if st.session_state["admin_show_login"] and not st.session_state["admin_mode"]:
+    with st.container():
+        st.markdown("""<div class="admin-login-modal"><div class="admin-login-icon">🛡️</div><div style="font-size:1.1rem;font-weight:700;color:#7C3AED;margin-top:0.5rem;">관리자 로그인</div><div style="font-size:0.8rem;color:#718096;">관리자 전용 기능에 접근합니다</div><div style="font-size:0.72rem;color:#A0AEC0;margin-top:0.3rem;">※ 일반 로그인과 별도의 관리자 전용 비밀번호입니다</div></div>""", unsafe_allow_html=True)
+        _, mid_col, _ = st.columns([1, 2, 1])
+        with mid_col:
+            def _admin_enter():
+                pw = st.session_state.get("admin_pw_input", "")
+                if pw == ADMIN_PASSWORD:
+                    st.session_state["admin_mode"] = True
+                    st.session_state["admin_show_login"] = False
+                else:
+                    st.session_state["_admin_login_error"] = True
+
+            st.text_input(
+                "관리자 비밀번호", type="password",
+                placeholder="비밀번호 입력",
+                label_visibility="collapsed",
+                key="admin_pw_input",
+                on_change=_admin_enter,
+            )
+            if st.session_state.pop("_admin_login_error", False):
+                st.error("비밀번호가 틀렸습니다.")
+            lc, cc = st.columns(2)
+            with lc:
+                if st.button("로그인", key="admin_login_confirm", use_container_width=True):
+                    if st.session_state.get("admin_pw_input", "") == ADMIN_PASSWORD:
+                        st.session_state["admin_mode"] = True
+                        st.session_state["admin_show_login"] = False
+                        st.success("✅ 관리자 모드 활성화")
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 틀렸습니다.")
+            with cc:
+                if st.button("취소", key="admin_login_cancel", use_container_width=True):
+                    st.session_state["admin_show_login"] = False
+                    st.rerun()
+    st.markdown("---")
 
 # ============================
 # 앱 헤더
@@ -1102,13 +1278,43 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
-    run_btn = st.button("분석 시작", use_container_width=True)
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        run_btn = st.button("분석 시작", use_container_width=True)
+    with btn_col2:
+        stop_btn = st.button("중지", use_container_width=True)
+
+    # ── 관리자 전용: 제외 키워드 관리 ──
+    if st.session_state["admin_mode"]:
+        st.markdown("---")
+        st.markdown('<span style="font-size:0.8rem;font-weight:700;color:#7C3AED;">🛡️ 관리자 — 키워드/URL 관리</span>', unsafe_allow_html=True)
+
+        _kw_type_map = {"제외": "exclude", "부정": "neg", "긍정": "pos", "홍보": "promo"}
+        kw_type_label = st.selectbox("유형", list(_kw_type_map.keys()), key="admin_kw_type", label_visibility="collapsed")
+        kw_type = _kw_type_map[kw_type_label]
+        new_kw = st.text_input("키워드", key="admin_new_kw", label_visibility="collapsed", placeholder="추가할 키워드 입력")
+        if st.button("➕ 시트에 키워드 추가", key="admin_add_kw", use_container_width=True) and new_kw.strip():
+            append_keyword_to_sheet(kw_type, new_kw.strip())
+            st.session_state["admin_exclude_kws"].append(new_kw.strip()) if kw_type == "exclude" else None
+            st.success(f"✅ [{kw_type}] '{new_kw.strip()}' 시트 저장 완료")
+            st.rerun()
+
+        st.markdown('<span style="font-size:0.75rem;color:#718096;">현재 세션 제외 키워드:</span>', unsafe_allow_html=True)
+        for i, kw in enumerate(st.session_state["admin_exclude_kws"]):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f'<span style="font-size:0.78rem;">{kw}</span>', unsafe_allow_html=True)
+            if c2.button("✕", key=f"admin_del_kw_{i}"):
+                st.session_state["admin_exclude_kws"].pop(i)
+                st.rerun()
 
 
 # ============================
 # 분석 실행
 # ============================
 if run_btn:
+    if stop_btn:
+        st.warning("분석이 중지되었습니다.")
+        st.stop()
     keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:3]
     if not keywords_raw:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
@@ -1184,6 +1390,9 @@ if run_btn:
     before_promo = len(unique_items)
     unique_items = [it for it in unique_items if not is_promotional(it)]
     promo_excluded = before_promo - len(unique_items)
+
+    # ── 관리자 제외 키워드 필터 ────────────────────────────────
+    unique_items = [it for it in unique_items if not is_admin_excluded(it)]
 
     # ── 관련 제외 키워드 필터 ─────────────────────────────────
     USIM_EXCLUDE_KW = [
@@ -1287,6 +1496,9 @@ if run_btn:
 
     progress_bar.empty(); status_text.empty()
 
+    # ── 제외 소분류 필터 ─────────────────────────────────────────
+    if EXCLUDE_SUBCATEGORIES:
+        results = [r for r in results if not any(es in (r.get("소분류") or "") for es in EXCLUDE_SUBCATEGORIES)]
     # ── 탭 렌더링 (지식인 탭 제거) ─────────────────────────────
     tab_dash, tab_blog, tab_cafe, tab_yt = st.tabs([
         "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"
@@ -1349,23 +1561,34 @@ if run_btn:
                     <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
                 </div>""", unsafe_allow_html=True)
 
-        if date_neg:
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 부정 건수</span></div>', unsafe_allow_html=True)
-            chart_df = pd.DataFrame(list(date_neg.items()), columns=["월","부정수"]).sort_values("월")
+        date_pos = {}
+        for r in results:
+            if r["감성"] == "긍정" and r.get("날짜"):
+                month = r["날짜"][:7]
+                date_pos[month] = date_pos.get(month, 0) + 1
+
+        all_months = sorted(set(list(date_neg.keys()) + list(date_pos.keys())))
+        if all_months:
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("월")} <span style="font-size:0.95rem;font-weight:600;">월별 긍정/부정 추이</span></div>', unsafe_allow_html=True)
+            chart_data = []
+            for m in all_months:
+                chart_data.append({"월": m, "건수": date_pos.get(m, 0), "감성": "긍정"})
+                chart_data.append({"월": m, "건수": date_neg.get(m, 0), "감성": "부정"})
+            chart_df = pd.DataFrame(chart_data)
             chart = (
                 alt.Chart(chart_df)
-                .mark_bar(color="#0066CC", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+                .mark_line(point=True, strokeWidth=2.5)
                 .encode(
                     x=alt.X("월:O", axis=alt.Axis(title="", labelAngle=0, labelFontSize=12)),
-                    y=alt.Y("부정수:Q", axis=alt.Axis(title="부정 건수", titleFontSize=11)),
-                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("부정수:Q", title="건수")]
+                    y=alt.Y("건수:Q", axis=alt.Axis(title="건수", titleFontSize=11)),
+                    color=alt.Color("감성:N", scale=alt.Scale(domain=["긍정","부정"], range=["#16A34A","#DC2626"]), legend=alt.Legend(title=None)),
+                    tooltip=[alt.Tooltip("월:O", title="월"), alt.Tooltip("감성:N", title="감성"), alt.Tooltip("건수:Q", title="건수")]
                 )
                 .properties(height=220)
                 .configure_view(strokeWidth=0)
                 .configure_axis(grid=False, domain=False)
             )
             st.altair_chart(chart, use_container_width=True)
-
         col_top1, col_top2 = st.columns(2)
         with col_top1:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("분류")} <span style="font-size:0.95rem;font-weight:600;">소분류 TOP 10</span></div>', unsafe_allow_html=True)
@@ -1390,8 +1613,8 @@ if run_btn:
         if neg_results:
             for r in neg_results[:20]:
                 _b    = SENT_BADGE.get(r["감성"], "")
-                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
-                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _sub  = ('<span class="badge-sub">🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code = ('<span class="badge-sub">🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
                 _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
                 _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
                 _title = r["title"] or "(제목 없음)"
@@ -1452,45 +1675,83 @@ if run_btn:
 
         st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
-        kw_stats = {}
-        for r in src_results:
-            kw = r.get("검색어","")
-            kw_stats.setdefault(kw, {"긍정":0,"부정":0,"중립":0})
-            kw_stats[kw][r["감성"]] += 1
-        kw_rows = []
-        for kw, s in kw_stats.items():
-            t2 = sum(s.values())
-            kw_rows.append({"검색어":kw,"긍정":s["긍정"],"부정":s["부정"],"중립":s["중립"],
-                            "합계":t2,"부정률(%)":round(s["부정"]/t2*100,1) if t2 else 0})
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.75rem;">{icon("검색")} <span style="font-size:0.95rem;font-weight:600;">검색어별 분포</span></div>', unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(kw_rows), use_container_width=True, hide_index=True, height=160)
+        sort_opt = st.selectbox("정렬", ["부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key=f"sort_{src_name}", label_visibility="collapsed")
+        if sort_opt == "부정 높은순":
+            src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
+        elif sort_opt == "부정 낮은순":
+            src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
+        elif sort_opt == "최신 날짜순":
+            src_results = sorted(src_results, key=lambda x: x.get("날짜", ""), reverse=True)
+        elif sort_opt == "오래된 날짜순":
+            src_results = sorted(src_results, key=lambda x: x.get("날짜", ""))
 
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과</span></div>', unsafe_allow_html=True)
-        for r in src_results:
+        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과 ({len(src_results)}건)</span></div>', unsafe_allow_html=True)
+
+        PAGE_SIZE = 20
+        total_pages = (len(src_results) - 1) // PAGE_SIZE + 1
+        page_key = f"page_{src_name}"
+        if page_key not in st.session_state:
+            st.session_state[page_key] = 1
+        current_page = st.session_state[page_key]
+
+        start_idx = (current_page - 1) * PAGE_SIZE
+        end_idx = start_idx + PAGE_SIZE
+        page_results = src_results[start_idx:end_idx]
+
+        for idx, r in enumerate(page_results):
             _b     = SENT_BADGE.get(r["감성"], "")
-            _sub   = ('<span>🗂 ' + r["소분류"]   + '</span>') if r.get("소분류")   else ""
-            _code  = ('<span>🔢 ' + r["품번"]     + '</span>') if r.get("품번")     else ""
+            _sub   = ('<span class="badge-sub">🗂 ' + r["소분류"]   + '</span>') if r.get("소분류")   else ""
+            _code  = ('<span class="badge-sub">🔢 ' + r["품번"]     + '</span>') if r.get("품번")     else ""
             _name  = ('<span>🏷 '  + r["품명"]     + '</span>') if r.get("품명")     else ""
             _price = ('<span>💰 ' + r["가격언급"] + '</span>') if r.get("가격언급") else ""
             _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
             _title = r["title"] or "(제목 없음)"
-            _html  = (
-                '<div class="result-card">'
-                '<div class="result-title">'
-                '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
-                '</div>'
-                '<div class="result-meta">'
-                '<span>🔍 ' + r["검색어"] + '</span>'
-                '<span>📅 ' + r["날짜"] + '</span>'
-                + _sub + _code + _name + _price + _badge +
-                '</div>'
-                '</div>'
-            )
-            st.markdown(_html, unsafe_allow_html=True)
+            if st.session_state.get("admin_mode"):
+                col_chk, col_card = st.columns([0.3, 9.7])
+                with col_chk:
+                    st.checkbox("", key=f"chk_{src_name}_{current_page}_{idx}", label_visibility="collapsed")
+                with col_card:
+                    st.markdown(
+                        '<div class="result-card"><div class="result-title">'
+                        '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                        '</div><div class="result-meta">'
+                        '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
+                        + _sub + _code + _name + _price + _badge +
+                        '</div></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    '<div class="result-card"><div class="result-title">'
+                    '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                    '</div><div class="result-meta">'
+                    '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
+                    + _sub + _code + _name + _price + _badge +
+                    '</div></div>', unsafe_allow_html=True)
+
+        # 관리자 모드: 일괄 제외 버튼
+        if st.session_state.get("admin_mode"):
+            checked_urls = [page_results[i]["link"] for i in range(len(page_results))
+                           if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
+            if st.button(f"🚫 선택한 글 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
+                for url in checked_urls:
+                    append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                st.success(f"✅ {len(checked_urls)}건 제외 완료 → 시트 저장됨 (다음 분석 시 자동 필터링됩니다)")
+
+        if total_pages > 1:
+            pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
+            with pg_col1:
+                if st.button("◀ 이전", key=f"prev_{src_name}", disabled=(current_page <= 1)):
+                    st.session_state[page_key] = current_page - 1
+                    st.rerun()
+            with pg_col2:
+                st.markdown(f'<div style="text-align:center;font-size:0.85rem;color:#4A5568;padding:0.5rem;">{current_page} / {total_pages} 페이지</div>', unsafe_allow_html=True)
+            with pg_col3:
+                if st.button("다음 ▶", key=f"next_{src_name}", disabled=(current_page >= total_pages)):
+                    st.session_state[page_key] = current_page + 1
+                    st.rerun()
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
-        st.download_button(f"📥 {src_name} CSV 다운로드", src_csv.encode("utf-8-sig"),
-            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
+        st.download_button(f"📥 {src_name} 전체 CSV 다운로드 ({len(src_results)}건)", src_csv.encode("utf-8-sig"),
+            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
     with tab_blog:
         render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
@@ -1527,44 +1788,82 @@ if run_btn:
                         <div class="metric-pct">{round(int(val)/yt_t*100) if yt_t else 0}%</div>
                     </div>""", unsafe_allow_html=True)
 
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("영상")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 (조회수 순)</span></div>', unsafe_allow_html=True)
-            for r in sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)[:20]:
+            yt_sort_opt = st.selectbox("정렬", ["조회수 높은순", "부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key="sort_yt", label_visibility="collapsed")
+            if yt_sort_opt == "조회수 높은순":
+                yt_sorted = sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)
+            elif yt_sort_opt == "부정 높은순":
+                yt_sorted = sorted(yt_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
+            elif yt_sort_opt == "부정 낮은순":
+                yt_sorted = sorted(yt_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
+            elif yt_sort_opt == "최신 날짜순":
+                yt_sorted = sorted(yt_results, key=lambda x: x.get("날짜", ""), reverse=True)
+            elif yt_sort_opt == "오래된 날짜순":
+                yt_sorted = sorted(yt_results, key=lambda x: x.get("날짜", ""))
+
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("영상")} <span style="font-size:0.95rem;font-weight:600;">영상 목록 ({len(yt_results)}건)</span></div>', unsafe_allow_html=True)
+
+            PAGE_SIZE_YT = 20
+            total_pages_yt = (len(yt_sorted) - 1) // PAGE_SIZE_YT + 1
+            yt_page_key = "page_유튜브"
+            if yt_page_key not in st.session_state:
+                st.session_state[yt_page_key] = 1
+            current_page_yt = st.session_state[yt_page_key]
+            start_yt = (current_page_yt - 1) * PAGE_SIZE_YT
+            page_yt = yt_sorted[start_yt:start_yt + PAGE_SIZE_YT]
+
+            for yt_idx, r in enumerate(page_yt):
                 b = SENT_BADGE.get(r["감성"],"")
                 views    = f"{r['views']:,}"    if isinstance(r.get("views"),int)    else "-"
                 likes    = f"{r['likes']:,}"    if isinstance(r.get("likes"),int)    else "-"
                 comments = f"{r['comments']:,}" if isinstance(r.get("comments"),int) else "-"
-                _sub  = ('<span>🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
-                _code = ('<span>🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
+                _sub  = ('<span class="badge-sub">🗂 ' + r["소분류"] + '</span>') if r.get("소분류") else ""
+                _code = ('<span class="badge-sub">🔢 ' + r["품번"]   + '</span>') if r.get("품번")   else ""
                 _name = ('<span>🏷 '  + r["품명"]   + '</span>') if r.get("품명")   else ""
-                st.markdown(f"""
-                <div class="result-card">
-                    <div class="result-title">
-                        <a href="{r['link']}" target="_blank" style="color:#1A202C;text-decoration:none;">{r['title']}</a>
-                    </div>
-                    <div class="result-meta">
-                        <span>📺 {r.get('channel','')}</span>
-                        <span>📅 {r['날짜']}</span>
-                        <span>▶ {views}</span>
-                        <span>♥ {likes}</span>
-                        <span>💬 {comments}</span>
-                        {_sub}{_code}{_name}
-                        <span class="{b}">{r['감성']} {fmt_score(r['확신도'])}</span>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                _badge = f'<span class="{b}">{r["감성"]} {fmt_score(r["확신도"])}</span>'
+                _card_html = (
+                    '<div class="result-card"><div class="result-title">'
+                    f'<a href="{r["link"]}" target="_blank" style="color:#1A202C;text-decoration:none;">{r["title"]}</a>'
+                    '</div><div class="result-meta">'
+                    f'<span>📺 {r.get("channel","")}</span>'
+                    f'<span>📅 {r["날짜"]}</span>'
+                    f'<span>▶ {views}</span><span>♥ {likes}</span><span>💬 {comments}</span>'
+                    f'{_sub}{_code}{_name}{_badge}'
+                    '</div></div>'
+                )
+                if st.session_state.get("admin_mode"):
+                    col_chk, col_card = st.columns([0.3, 9.7])
+                    with col_chk:
+                        st.checkbox("", key=f"chk_yt_{current_page_yt}_{yt_idx}", label_visibility="collapsed")
+                    with col_card:
+                        st.markdown(_card_html, unsafe_allow_html=True)
+                else:
+                    st.markdown(_card_html, unsafe_allow_html=True)
 
-            st.markdown("""
-            <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:10px;text-align:center;">
-                <div style="font-size:0.9rem;font-weight:600;color:#64748B;margin-bottom:0.3rem;">💬 유튜브 댓글 감성분석</div>
-                <div class="badge-coming" style="display:inline-flex;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    추가 예정 기능입니다
-                </div>
-                <div style="font-size:0.75rem;color:#94A3B8;margin-top:0.5rem;">다음 버전에서 제공될 예정입니다</div>
-            </div>
-            """, unsafe_allow_html=True)
+            # 관리자 모드: 일괄 제외 버튼
+            if st.session_state.get("admin_mode"):
+                checked_yt_urls = [page_yt[i]["link"] for i in range(len(page_yt))
+                                   if st.session_state.get(f"chk_yt_{current_page_yt}_{i}")]
+                if st.button(f"🚫 선택한 글 제외 ({len(checked_yt_urls)}건)", key=f"bulk_exc_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
+                    for url in checked_yt_urls:
+                        append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                    st.success(f"✅ {len(checked_yt_urls)}건 제외 완료 → 시트 저장됨 (다음 분석 시 자동 필터링됩니다)")
 
+            if total_pages_yt > 1:
+                yp1, yp2, yp3 = st.columns([1, 2, 1])
+                with yp1:
+                    if st.button("◀ 이전", key="prev_yt", disabled=(current_page_yt <= 1)):
+                        st.session_state[yt_page_key] = current_page_yt - 1
+                        st.rerun()
+                with yp2:
+                    st.markdown(f'<div style="text-align:center;font-size:0.85rem;color:#4A5568;padding:0.5rem;">{current_page_yt} / {total_pages_yt} 페이지</div>', unsafe_allow_html=True)
+                with yp3:
+                    if st.button("다음 ▶", key="next_yt", disabled=(current_page_yt >= total_pages_yt)):
+                        st.session_state[yt_page_key] = current_page_yt + 1
+                        st.rerun()
+
+            yt_csv = pd.DataFrame(yt_results).to_csv(index=False, encoding="utf-8-sig")
+            st.download_button(f"📥 유튜브 전체 CSV 다운로드 ({len(yt_results)}건)", yt_csv.encode("utf-8-sig"),
+                f"ISSUE_유튜브_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
         <span style="font-size:0.75rem;color:#A0AEC0;">DAISO SNS ISSUE FINDER · KLUE-RoBERTa + 룰베이스 앙상블 · Created by 데이터분석팀</span>
