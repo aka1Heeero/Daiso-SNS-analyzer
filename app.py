@@ -1475,7 +1475,7 @@ if run_btn:
     st.session_state["analysis_end_date"] = end_date
 
 # ── 결과가 session_state에 있으면 항상 탭 렌더링 ──
-if "analysis_results" in st.session_state and st.session_state["analysis_results"]:
+    if "analysis_results" in st.session_state and st.session_state["analysis_results"]:
     results    = st.session_state["analysis_results"]
     start_date = st.session_state["analysis_start_date"]
     end_date   = st.session_state["analysis_end_date"]
