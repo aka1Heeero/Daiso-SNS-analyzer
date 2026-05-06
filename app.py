@@ -1479,7 +1479,7 @@ if run_btn:
         results    = st.session_state["analysis_results"]
         start_date = st.session_state["analysis_start_date"]
         end_date   = st.session_state["analysis_end_date"]
-        "📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"]
+        ["📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"]
 
         total = len(results)
         pos   = sum(1 for r in results if r["감성"]=="긍정")
