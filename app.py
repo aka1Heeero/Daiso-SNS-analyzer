@@ -505,12 +505,12 @@ def load_keywords_from_sheet():
     try:
         gc = _get_gspread_client()
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("keyword")
+        ws = sh.worksheet("keywords")
         rows = ws.get_all_records()
         result = {"neg": [], "pos": [], "promo": [], "exclude": []}
         for r in rows:
             t = r.get("type", "").strip().lower()
-            kw = r.get("keyword", "").strip()
+            kw = r.get("keywords", "").strip()
             if t in result and kw:
                 result[t].append(kw)
         return result
@@ -524,20 +524,20 @@ def load_excluded_urls_from_sheet():
     try:
         gc = _get_gspread_client()
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("exclude_urls")
+        ws = sh.worksheet("excluded_urls")
         rows = ws.get_all_records()
         return {r.get("url", "").strip() for r in rows if r.get("url", "").strip()}
     except Exception as e:
-        st.warning(f"⚠ exclude_urls 시트 로드 실패: {e}")
+        st.warning(f"⚠ excluded_urls 시트 로드 실패: {e}")
         return set()
 
-def append_keyword_to_sheet(kw_type, keyword):
+def append_keyword_to_sheet(kw_type, keywords):
     """구글시트 [keyword] 탭에 키워드 추가."""
     try:
         gc = _get_gspread_client(readonly=False)
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("keyword")
-        ws.append_row([kw_type, keyword, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        ws = sh.worksheet("keywords")
+        ws.append_row([kw_type, keywords, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         load_keywords_from_sheet.clear()
     except Exception as e:
         st.error(f"시트 저장 실패: {e}")
@@ -547,7 +547,7 @@ def append_excluded_url_to_sheet(url, reason="관리자 제외"):
     try:
         gc = _get_gspread_client(readonly=False)
         sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("exclude_urls")
+        ws = sh.worksheet("excluded_urls")
         ws.append_row([url, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         load_excluded_urls_from_sheet.clear()
     except Exception as e:
@@ -728,8 +728,8 @@ def is_daiso_related(item: dict) -> bool:
     full  = (title + " " + desc).upper()
     return any(v.upper() in full for v in DAISO_VARIANTS)
 
-def build_naver_query(raw_keyword: str) -> str:
-    kw = raw_keyword.strip()
+def build_naver_query(raw_keywords: str) -> str:
+    kw = raw_keywords.strip()
     has_daiso = any(v in kw for v in DAISO_VARIANTS)
     if not has_daiso:
         kw = "다이소 " + kw
