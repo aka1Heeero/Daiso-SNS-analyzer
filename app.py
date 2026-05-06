@@ -1749,8 +1749,8 @@ if run_btn:
 
         src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
         st.download_button(f"📥 {src_name} 전체 CSV 다운로드 ({len(src_results)}건)", src_csv.encode("utf-8-sig"),
-            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
-
+            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)            
+        
     with tab_blog:
         render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
 
