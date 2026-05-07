@@ -622,7 +622,7 @@ def load_subcategories():
 SUBCATEGORIES = load_subcategories()
 
 # ── 제외할 소분류 (직접 수정) ──
-EXCLUDE_SUBCATEGORIES = ["차", "자","커피","라면",]
+EXCLUDE_SUBCATEGORIES = ["차", "자","커피","라면"]
 
 # ============================================== AI모델링 (KLUE-RoBERTa + 룰베이스)
 @st.cache_resource
@@ -779,13 +779,20 @@ def is_daiso_related(item: dict) -> bool:
     title = item.get("title", "")
     desc  = item.get("description", "")
     combined = title + " " + desc
-    # 검색어 하이라이트에서 다이소 변형만 제거 (다른 <b> 내용은 유지)
-    for v in DAISO_VARIANTS:
-        combined = combined.replace(f"<b>{v}</b>", "")
-    # 나머지 HTML 태그 제거
+    # HTML 태그 제거 (하이라이트 포함) 후 체크
     raw = re.sub(r'<[^>]+>', '', combined)
     raw = re.sub(r'&[a-zA-Z]+;', ' ', raw)
-    return any(v in raw for v in DAISO_VARIANTS) or any(v.upper() in raw.upper() for v in DAISO_VARIANTS)
+    # 검색어에 다이소가 포함된 상태로 검색했으므로, 텍스트에 다이소가 있으면 통과
+    if any(v in raw for v in DAISO_VARIANTS) or any(v.upper() in raw.upper() for v in DAISO_VARIANTS):
+        return True
+    # 검색어 자체에 다이소가 있으면 (build_naver_query가 자동 추가) 검색어 필드로 판단
+    query = item.get("검색어", "")
+    if any(v in query for v in DAISO_VARIANTS):
+        # 제목에서 태그 제거 후 다이소 확인
+        title_raw = re.sub(r'<[^>]+>', '', title)
+        if any(v in title_raw for v in DAISO_VARIANTS) or any(v.upper() in title_raw.upper() for v in DAISO_VARIANTS):
+            return True
+    return False
 
 def build_naver_query(raw_keywords: str) -> str:
     kw = raw_keywords.strip()
