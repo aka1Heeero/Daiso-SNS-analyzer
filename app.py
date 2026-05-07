@@ -622,7 +622,7 @@ def load_subcategories():
 SUBCATEGORIES = load_subcategories()
 
 # ── 제외할 소분류 (직접 수정) ──
-EXCLUDE_SUBCATEGORIES = ["차", "자","라면","커피",]
+EXCLUDE_SUBCATEGORIES = ["차", "자","커피","라면",]
 
 # ============================================== AI모델링 (KLUE-RoBERTa + 룰베이스)
 @st.cache_resource
@@ -778,10 +778,12 @@ DAISO_VARIANTS = ["다이소", "DAISO", "daiso"]
 def is_daiso_related(item: dict) -> bool:
     title = item.get("title", "")
     desc  = item.get("description", "")
-    # 네이버 API가 검색어를 <b>태그로 감싸서 반환하므로, 태그 제거 전 원본에서 확인
-    # <b>다이소</b> 형태의 하이라이트를 제거한 뒤 다이소가 남아있는지 체크
-    raw = re.sub(r'<b>([^<]*)</b>', '', title + " " + desc)
-    raw = re.sub(r'<[^>]+>', '', raw)
+    combined = title + " " + desc
+    # 검색어 하이라이트에서 다이소 변형만 제거 (다른 <b> 내용은 유지)
+    for v in DAISO_VARIANTS:
+        combined = combined.replace(f"<b>{v}</b>", "")
+    # 나머지 HTML 태그 제거
+    raw = re.sub(r'<[^>]+>', '', combined)
     raw = re.sub(r'&[a-zA-Z]+;', ' ', raw)
     return any(v in raw for v in DAISO_VARIANTS) or any(v.upper() in raw.upper() for v in DAISO_VARIANTS)
 
@@ -996,10 +998,8 @@ USIM_EXCLUDE_KW = [
     "매장 옆","매장앞","매장 앞","매장 옆","옆 매장","옆가게","옆 매장",
     "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
     "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
-    "다이소유심","다이소 유심","다이소심카드","다이소 심카드","정액","정력",
-    "이재명","대통령","주식","창업","소자본","부업","투잡","재테크","용돈벌이",
+    "다이소유심","다이소 유심","다이소심카드","다이소 심카드","정액","정력","이재명","대통령","주식","창업","소자본","부업","투잡","재테크","용돈벌이",
     "신용불량","사기","피해","보이스피싱","스미싱","금융사기","대출사기","투자사기",
-    "고소득",
 ]
 
 def is_usim_related(item):
@@ -1148,35 +1148,7 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     n  = sum(1 for r in src_results if r["감성"]=="부정")
     ne = sum(1 for r in src_results if r["감성"]=="중립")
 
-    # ── 감성 필터 상태 ──
-    filter_key = f"filter_{src_name}"
-    if filter_key not in st.session_state:
-        st.session_state[filter_key] = "전체"
-
-    # ── 카드형 버튼 CSS ──
-    st.markdown(f'''<style>
-    [data-testid="stHorizontalBlock"] .card-btn-{src_name} button {{
-        background: var(--bg-white) !important;
-        border: 1.5px solid var(--border) !important;
-        border-radius: 12px !important;
-        padding: 0.8rem 0.5rem !important;
-        min-height: 90px !important;
-        color: var(--text) !important;
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        box-shadow: var(--shadow) !important;
-        transition: all 0.15s !important;
-    }}
-    [data-testid="stHorizontalBlock"] .card-btn-{src_name} button:hover {{
-        border-color: var(--primary) !important;
-        box-shadow: var(--shadow-md) !important;
-    }}
-    .card-btn-{src_name}-active button {{
-        border: 2px solid var(--primary) !important;
-        background: var(--primary-lt) !important;
-    }}
-    </style>''', unsafe_allow_html=True)
-
+    # ── 메트릭 카드 (표시 전용) ──
     c1, c2, c3, c4 = st.columns(4)
     for col, cls, lbl, val, ic_txt in [
         (c1,"total","전체",str(t),"전체"),
@@ -1185,19 +1157,25 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
         (c4,"neu","중립",str(ne),"중립"),
     ]:
         with col:
-            active = st.session_state[filter_key] == lbl
-            active_cls = f"card-btn-{src_name}-active" if active else f"card-btn-{src_name}"
-            pct = round(int(val)/t*100) if t else 0
-            with st.container():
-                st.markdown(f'<div class="{active_cls}">', unsafe_allow_html=True)
-                if st.button(f"{ic_txt}\n{val}건 ({pct}%)", key=f"btn_{src_name}_{lbl}", use_container_width=True):
-                    st.session_state[filter_key] = lbl if st.session_state[filter_key] != lbl else "전체"
-                    st.session_state[f"page_{src_name}"] = 1
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-card {cls}">
+                <div class="metric-label">
+                    <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
+                </div>
+                <div class="metric-value">{val}</div>
+                <div class="metric-pct">{round(int(val)/t*100) if t else 0}%</div>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+
+    # ── 필터(왼쪽) + 정렬(오른쪽) ──
+    filter_col, sort_col = st.columns([1, 1])
+    with filter_col:
+        current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"], key=f"filter_{src_name}", horizontal=True, label_visibility="collapsed")
+    with sort_col:
+        sort_opt = st.radio("정렬", ["부정 높은순", "부정 낮은순", "최신순", "오래된순"], key=f"sort_{src_name}", horizontal=True, label_visibility="collapsed")
 
     # ── 필터 적용 ──
-    current_filter = st.session_state[filter_key]
     if current_filter == "긍정":
         src_results = [r for r in src_results if r["감성"] == "긍정"]
     elif current_filter == "부정":
@@ -1205,22 +1183,14 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     elif current_filter == "중립":
         src_results = [r for r in src_results if r["감성"] == "중립"]
 
-    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
-
-    # ── 정렬 + 필터 표시 (오른쪽 박스 안에 통합) ──
-    st.markdown(f'''
-    <div style="background:var(--primary-lt);border:1px solid var(--primary-md);border-radius:8px;padding:0.5rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-        <span style="font-size:0.78rem;color:var(--text3);font-weight:500;">🔍 현재 필터: <strong style="color:var(--primary);">{current_filter}</strong> &nbsp;|&nbsp; {len(src_results)}건</span>
-    </div>''', unsafe_allow_html=True)
-    sort_opt = st.radio("정렬", ["부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key=f"sort_{src_name}", horizontal=True, label_visibility="collapsed")
-
+    # ── 정렬 적용 ──
     if sort_opt == "부정 높은순":
         src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
     elif sort_opt == "부정 낮은순":
         src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
-    elif sort_opt == "최신 날짜순":
+    elif sort_opt == "최신순":
         src_results = sorted(src_results, key=lambda x: x.get("날짜", ""), reverse=True)
-    elif sort_opt == "오래된 날짜순":
+    elif sort_opt == "오래된순":
         src_results = sorted(src_results, key=lambda x: x.get("날짜", ""))
 
     st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과 ({len(src_results)}건)</span></div>', unsafe_allow_html=True)
@@ -1526,14 +1496,7 @@ with st.sidebar:
         label_visibility="collapsed",
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
-    
-    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        run_btn = st.button("AI분석시작", use_container_width=True)
-    with btn_col2:
-        stop_btn = st.button("분석중지", use_container_width=True)
-    
+
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
@@ -1553,6 +1516,16 @@ with st.sidebar:
         • 룰베이스 가중치: <code>* 1.2</code> (키워드 보강)<br>
     </div>
     """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        run_btn = st.button("분석 시작", use_container_width=True)
+    with btn_col2:
+        stop_btn = st.button("중지", use_container_width=True)
+
+
+
 
 # ============================
 # 분석 실행
@@ -1919,11 +1892,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             yt_n  = sum(1 for r in yt_results if r["감성"]=="부정")
             yt_ne = sum(1 for r in yt_results if r["감성"]=="중립")
 
-            # ── 감성 필터 상태 ──
-            yt_filter_key = "filter_유튜브"
-            if yt_filter_key not in st.session_state:
-                st.session_state[yt_filter_key] = "전체"
-
+            # ── 메트릭 카드 (표시 전용) ──
             yc1, yc2, yc3, yc4 = st.columns(4)
             for col, cls, lbl, val, ic_txt in [
                 (yc1,"total","전체",str(yt_t),"전체"),
@@ -1932,19 +1901,25 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
                 (yc4,"neu","중립",str(yt_ne),"중립"),
             ]:
                 with col:
-                    active = st.session_state[yt_filter_key] == lbl
-                    pct = round(int(val)/yt_t*100) if yt_t else 0
-                    active_cls = "card-btn-yt-active" if active else "card-btn-yt"
-                    with st.container():
-                        st.markdown(f'<div class="{active_cls}">', unsafe_allow_html=True)
-                        if st.button(f"{ic_txt}\n{val}건 ({pct}%)", key=f"btn_yt_{lbl}", use_container_width=True):
-                            st.session_state[yt_filter_key] = lbl if st.session_state[yt_filter_key] != lbl else "전체"
-                            st.session_state["page_유튜브"] = 1
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="metric-card {cls}">
+                        <div class="metric-label">
+                            <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
+                        </div>
+                        <div class="metric-value">{val}</div>
+                        <div class="metric-pct">{round(int(val)/yt_t*100) if yt_t else 0}%</div>
+                    </div>""", unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+
+            # ── 필터(왼쪽) + 정렬(오른쪽) ──
+            yt_fcol, yt_scol = st.columns([1, 1])
+            with yt_fcol:
+                yt_current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"], key="filter_유튜브", horizontal=True, label_visibility="collapsed")
+            with yt_scol:
+                yt_sort_opt = st.radio("정렬", ["조회수순", "부정높은순", "부정낮은순", "최신순", "오래된순"], key="sort_yt", horizontal=True, label_visibility="collapsed")
 
             # ── 필터 적용 ──
-            yt_current_filter = st.session_state[yt_filter_key]
             if yt_current_filter == "긍정":
                 yt_results = [r for r in yt_results if r["감성"] == "긍정"]
             elif yt_current_filter == "부정":
@@ -1952,22 +1927,16 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             elif yt_current_filter == "중립":
                 yt_results = [r for r in yt_results if r["감성"] == "중립"]
 
-            # ── 정렬 + 필터 표시 ──
-            st.markdown(f'''
-            <div style="background:var(--primary-lt);border:1px solid var(--primary-md);border-radius:8px;padding:0.5rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-                <span style="font-size:0.78rem;color:var(--text3);font-weight:500;">🔍 현재 필터: <strong style="color:var(--primary);">{yt_current_filter}</strong> &nbsp;|&nbsp; {len(yt_results)}건</span>
-            </div>''', unsafe_allow_html=True)
-            yt_sort_opt = st.radio("정렬", ["조회수 높은순", "부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key="sort_yt", horizontal=True, label_visibility="collapsed")
-
-            if yt_sort_opt == "조회수 높은순":
+            # ── 정렬 적용 ──
+            if yt_sort_opt == "조회수순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)
-            elif yt_sort_opt == "부정 높은순":
+            elif yt_sort_opt == "부정높은순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
-            elif yt_sort_opt == "부정 낮은순":
+            elif yt_sort_opt == "부정낮은순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
-            elif yt_sort_opt == "최신 날짜순":
+            elif yt_sort_opt == "최신순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("날짜", ""), reverse=True)
-            elif yt_sort_opt == "오래된 날짜순":
+            elif yt_sort_opt == "오래된순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("날짜", ""))
             else:
                 yt_sorted = yt_results
