@@ -971,7 +971,7 @@ USIM_EXCLUDE_KW = [
     "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
     "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
     "다이소유심","다이소 유심","다이소심카드","다이소 심카드","정액","정력","이재명","대통령","주식","창업","소자본","부업","투잡","재테크","용돈벌이",
-    "신용불량","사기","피해","보이스피싱","스미싱","금융사기","대출사기","투자사기",
+    "신용불량","사기","피해","보이스피싱","스미싱","금융사기","대출사기","투자사기","양도양수","고수익","권리금",
 ]
 
 def is_usim_related(item):
@@ -2012,7 +2012,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
     if tab_admin is not None:
         with tab_admin:
             st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 1rem;">{icon("🛡")} <span style="font-size:0.95rem;font-weight:600;">관리자 — 키워드 / URL 관리</span></div>', unsafe_allow_html=True)
-
+     
             sheet_kw = load_keywords_from_sheet()
 
             # ── 뱃지 렌더링 함수 ──
