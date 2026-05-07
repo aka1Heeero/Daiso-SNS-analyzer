@@ -1497,6 +1497,13 @@ with st.sidebar:
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
 
+    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        run_btn = st.button("분석 시작", use_container_width=True)
+    with btn_col2:
+        stop_btn = st.button("중지", use_container_width=True)
+
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">⚙</div>
@@ -1516,15 +1523,6 @@ with st.sidebar:
         • 룰베이스 가중치: <code>* 1.2</code> (키워드 보강)<br>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        run_btn = st.button("분석 시작", use_container_width=True)
-    with btn_col2:
-        stop_btn = st.button("중지", use_container_width=True)
-
-
 
 
 # ============================
