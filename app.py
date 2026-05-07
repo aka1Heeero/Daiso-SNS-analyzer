@@ -703,9 +703,10 @@ LABEL_MAP = {
     "부정":"부정","긍정":"긍정",
 }
 
-def rule_based(text: str):
-    neg = sum(1 for kw in NEGATIVE_KW if kw in text)
-    pos = sum(1 for kw in POSITIVE_KW if kw in text)
+def rule_based(text: str, exclude_words=None):
+    exclude = exclude_words or []
+    neg = sum(1 for kw in NEGATIVE_KW if kw in text and kw not in exclude)
+    pos = sum(1 for kw in POSITIVE_KW if kw in text and kw not in exclude)
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
@@ -731,8 +732,9 @@ def get_reason_sentence(full_text: str, sentiment: str) -> str:
         best_sent = best_sent[:80] + "…"
     return best_sent
 
-def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
+def ensemble_sentiment(roberta_output, full_text: str, threshold: int, exclude_words=None) -> tuple:
     votes = {"긍정": 0.0, "부정": 0.0, "중립": 0.0}
+    exclude = exclude_words or []
 
     roberta_neg_prob = 0.0
     if roberta_output:
@@ -746,7 +748,7 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
         except Exception:
             pass
 
-    rule_lbl, rule_sc = rule_based(full_text)
+    rule_lbl, rule_sc = rule_based(full_text, exclude_words=exclude)
     votes[rule_lbl] += rule_sc * 1.2
 
     total = sum(votes.values())
@@ -754,7 +756,7 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int) -> tuple:
         return "중립", 50, ""
     best  = max(votes, key=votes.get)
     score = round(votes[best] / total * 100)
-    neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full_text)
+    neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full_text and kw not in exclude)
 
     if neg_kw_cnt >= 3:
         return "부정", max(score, 75), get_reason_sentence(full_text, "부정")
@@ -1352,11 +1354,11 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">D</div>
+        ">DATA&TQC</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
+        <div class="header-title">SNS Issue Finder : 고객 불만 AI분석</div>
         <div class="header-sub">네이버 블로그 · 카페 · 유튜브 &nbsp;|&nbsp; KLUE-RoBERTa + 룰베이스 앙상블</div>
     </div>
 </div>
@@ -1508,9 +1510,9 @@ with st.sidebar:
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
-        run_btn = st.button("분석 시작", use_container_width=True)
+        run_btn = st.button("AI분석시작", use_container_width=True)
     with btn_col2:
-        stop_btn = st.button("중지", use_container_width=True)
+        stop_btn = st.button("분석중지", use_container_width=True)
 
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
@@ -1652,7 +1654,9 @@ if run_btn:
         r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=128) if model_r else [None]*len(texts)
 
         for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
-            sentiment, score, reason = ensemble_sentiment(r_batch[idx], full, threshold)
+            # 검색어에 포함된 단어를 룰베이스에서 제외
+            query_words = [w for w in item.get("검색어", "").split() if w not in DAISO_VARIANTS]
+            sentiment, score, reason = ensemble_sentiment(r_batch[idx], full, threshold, exclude_words=query_words)
 
             date_str = item.get("날짜","") if src == "유튜브" else (
                 lambda dt: dt.strftime("%Y-%m-%d") if dt else ""
