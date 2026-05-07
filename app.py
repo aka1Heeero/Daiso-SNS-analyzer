@@ -1,3 +1,10 @@
+ # -*- coding: utf-8 -*-
+"""
+Created on Thu May  7 10:31:52 2026
+
+@author: AD1501015P01
+"""
+
 import streamlit as st
 import requests
 import openpyxl
@@ -6,7 +13,9 @@ import io
 import gspread
 import pandas as pd
 import altair as alt
+import concurrent.futures
 from datetime import datetime, date
+from email.utils import parsedate_to_datetime
 from google.oauth2.service_account import Credentials
 from transformers import pipeline
 from collections import Counter
@@ -510,7 +519,7 @@ def load_keywords_from_sheet():
         result = {"neg": [], "pos": [], "promo": [], "exclude": []}
         for r in rows:
             t = r.get("type", "").strip().lower()
-            kw = r.get("keywords", "").strip()
+            kw = (r.get("keyword", "") or r.get("keywords", "")).strip()
             if t in result and kw:
                 result[t].append(kw)
         return result
@@ -690,6 +699,8 @@ def get_reason_sentence(full_text: str, sentiment: str) -> str:
         s = s.strip()
         if not s:
             continue
+        if sentiment == "부정" and "다이소" not in full_text and "다이소" not in s:
+            continue
         cnt = sum(1 for kw in kw_list if kw in s)
         if cnt > best_cnt:
             best_cnt = cnt
@@ -844,27 +855,45 @@ def collect_cafe_paged(query: str, total: int) -> list:
 # ============================
 def search_youtube(query: str, max_results: int = 30) -> list:
     if not YOUTUBE_API_KEY: return []
-    try:
-        resp = requests.get("https://www.googleapis.com/youtube/v3/search", params={
+    all_items = []
+    page_token = None
+    while len(all_items) < max_results:
+        params = {
             "key": YOUTUBE_API_KEY, "q": query, "part": "snippet",
-            "type": "video", "maxResults": min(max_results, 50),
+            "type": "video", "maxResults": min(50, max_results - len(all_items)),
             "order": "date", "relevanceLanguage": "ko", "regionCode": "KR"
-        }, timeout=10)
-        data = resp.json()
-    except Exception: return []
-    if "error" in data: return []
-    items     = data.get("items", [])
-    video_ids = [i["id"]["videoId"] for i in items if i.get("id", {}).get("videoId")]
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        try:
+            resp = requests.get("https://www.googleapis.com/youtube/v3/search", params=params, timeout=10)
+            data = resp.json()
+        except Exception:
+            break
+        if "error" in data:
+            break
+        items = data.get("items", [])
+        if not items:
+            break
+        all_items.extend(items)
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            break
+    all_items = all_items[:max_results]
+    video_ids = [i["id"]["videoId"] for i in all_items if i.get("id", {}).get("videoId")]
     stats_map = {}
     if video_ids:
-        try:
-            for sv in requests.get("https://www.googleapis.com/youtube/v3/videos", params={
-                "key": YOUTUBE_API_KEY, "id": ",".join(video_ids), "part": "statistics"
-            }, timeout=10).json().get("items", []):
-                stats_map[sv["id"]] = sv.get("statistics", {})
-        except Exception: pass
+        for i in range(0, len(video_ids), 50):
+            chunk = video_ids[i:i+50]
+            try:
+                for sv in requests.get("https://www.googleapis.com/youtube/v3/videos", params={
+                    "key": YOUTUBE_API_KEY, "id": ",".join(chunk), "part": "statistics"
+                }, timeout=10).json().get("items", []):
+                    stats_map[sv["id"]] = sv.get("statistics", {})
+            except Exception:
+                pass
     results = []
-    for item in items:
+    for item in all_items:
         vid_id  = item.get("id", {}).get("videoId", "")
         snippet = item.get("snippet", {})
         stats   = stats_map.get(vid_id, {})
@@ -886,6 +915,14 @@ def search_youtube(query: str, max_results: int = 30) -> list:
     return results
 
 
+def _fetch(task, display_count):
+    tp, kw, label = task
+    if tp == "blog": return label, kw, collect_naver_paged(kw, "blog", display_count)
+    if tp == "cafe": return label, kw, collect_cafe_paged(kw, display_count)
+    if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
+    return label, kw, []
+
+
 # ============================
 # 날짜 파싱 & 필터
 # ============================
@@ -894,18 +931,18 @@ def parse_date(item: dict):
     try:
         if len(ds) == 8:
             return datetime.strptime(ds, "%Y%m%d")
-        return datetime.strptime(ds[:25], "%a, %d %b %Y %H:%M:%S")
+        return parsedate_to_datetime(ds).replace(tzinfo=None)
     except:
-        try:
-            return datetime.strptime(ds[:16], "%a, %d %b %Y")
-        except:
-            return None
+        return None
 
 def filter_by_date(items: list, start_dt: date, end_dt: date) -> list:
     s = datetime(start_dt.year, start_dt.month, start_dt.day)
     e = datetime(end_dt.year,   end_dt.month,   end_dt.day, 23, 59, 59)
     result = []
     for item in items:
+        if item.get("출처") == "카페":
+            result.append(item)
+            continue
         dt = item.get("pub_dt") if item.get("출처") == "유튜브" else parse_date(item)
         if dt and s <= dt <= e: result.append(item)
     return result
@@ -923,6 +960,22 @@ def is_admin_excluded(item):
     all_exclude_kws = st.session_state.get("admin_exclude_kws", []) + SHEET_EXCLUDE_KW
     return any(kw in full for kw in all_exclude_kws)
 
+
+# ============================
+# 유심 관련 제외 필터
+# ============================
+USIM_EXCLUDE_KW = [
+    "유심","USIM","유심칩","유심카드","심카드","SIM카드",
+    "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
+    "매장 옆","매장앞","매장 앞","매장 옆","옆 매장","옆가게","옆 매장",
+    "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
+    "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
+    "다이소유심","다이소 유심","다이소심카드","다이소 심카드",
+]
+
+def is_usim_related(item):
+    text = (clean_text(item.get("title","")) + " " + clean_text(item.get("description",""))).upper()
+    return any(kw.upper() in text for kw in USIM_EXCLUDE_KW)
 
 # ============================
 # 품번 추출
@@ -1024,6 +1077,115 @@ def fmt_score(score) -> str:
     except:
         return f"{score}%"
 
+
+def render_detail_tab(src_results, src_name, start_date, end_date):
+    if not src_results:
+        st.info(f"{src_name} 수집 결과가 없습니다."); return
+    t  = len(src_results)
+    p  = sum(1 for r in src_results if r["감성"]=="긍정")
+    n  = sum(1 for r in src_results if r["감성"]=="부정")
+    ne = sum(1 for r in src_results if r["감성"]=="중립")
+
+    c1, c2, c3, c4 = st.columns(4)
+    for col, cls, lbl, val, ic_txt in [
+        (c1,"total","전체",str(t),"전체"),
+        (c2,"pos","긍정",str(p),"긍정"),
+        (c3,"neg","부정",str(n),"부정"),
+        (c4,"neu","중립",str(ne),"중립"),
+    ]:
+        with col:
+            st.markdown(f"""
+            <div class="metric-card {cls}">
+                <div class="metric-label">
+                    <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
+                </div>
+                <div class="metric-value">{val}</div>
+                <div class="metric-pct">{round(int(val)/t*100) if t else 0}%</div>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+
+    sort_opt = st.radio("정렬", ["부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key=f"sort_{src_name}", horizontal=True, label_visibility="collapsed")
+    if sort_opt == "부정 높은순":
+        src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
+    elif sort_opt == "부정 낮은순":
+        src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
+    elif sort_opt == "최신 날짜순":
+        src_results = sorted(src_results, key=lambda x: x.get("날짜", ""), reverse=True)
+    elif sort_opt == "오래된 날짜순":
+        src_results = sorted(src_results, key=lambda x: x.get("날짜", ""))
+
+    st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과 ({len(src_results)}건)</span></div>', unsafe_allow_html=True)
+
+    PAGE_SIZE = 20
+    total_pages = (len(src_results) - 1) // PAGE_SIZE + 1
+    page_key = f"page_{src_name}"
+    if page_key not in st.session_state:
+        st.session_state[page_key] = 1
+    current_page = st.session_state[page_key]
+
+    start_idx = (current_page - 1) * PAGE_SIZE
+    end_idx = start_idx + PAGE_SIZE
+    page_results = src_results[start_idx:end_idx]
+
+    for idx, r in enumerate(page_results):
+        _b     = SENT_BADGE.get(r["감성"], "")
+        _sub   = ('<span class="badge-sub">🗂 ' + r["소분류"]   + '</span>') if r.get("소분류")   else ""
+        _code  = ('<span class="badge-sub">🔢 ' + r["품번"]     + '</span>') if r.get("품번")     else ""
+        _name  = ('<span>🏷 '  + r["품명"]     + '</span>') if r.get("품명")     else ""
+        _price = ('<span>💰 ' + r["가격언급"] + '</span>') if r.get("가격언급") else ""
+        _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
+        _reason = ('<div style="font-size:0.75rem;color:#64748B;margin-top:0.3rem;padding-left:0.5rem;border-left:2px solid #E2E8F0;">💬 ' + r["reason"] + '</div>') if r.get("reason") else ""
+        _title = r["title"] or "(제목 없음)"
+        if st.session_state.get("admin_mode"):
+            col_chk, col_card = st.columns([0.3, 9.7])
+            with col_chk:
+                st.checkbox("", key=f"chk_{src_name}_{current_page}_{idx}", label_visibility="collapsed")
+            with col_card:
+                st.markdown(
+                    '<div class="result-card"><div class="result-title">'
+                    '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                    '</div><div class="result-meta">'
+                    '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
+                    + _sub + _code + _name + _price + _badge +
+                    '</div>' + _reason + '</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(
+                '<div class="result-card"><div class="result-title">'
+                '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
+                '</div><div class="result-meta">'
+                '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
+                + _sub + _code + _name + _price + _badge +
+                '</div>' + _reason + '</div>', unsafe_allow_html=True)
+
+    if st.session_state.get("admin_mode"):
+        checked_urls = [page_results[i]["link"] for i in range(len(page_results))
+                       if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
+        if st.button(f"🚫 선택한 글 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
+            for url in checked_urls:
+                append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+            st.session_state["analysis_results"] = [
+                r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
+            ]
+            st.success(f"✅ {len(checked_urls)}건 제외 완료")
+            st.rerun()
+
+    if total_pages > 1:
+        pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
+        with pg_col1:
+            if st.button("◀ 이전", key=f"prev_{src_name}", disabled=(current_page <= 1)):
+                st.session_state[page_key] = current_page - 1
+                st.rerun()
+        with pg_col2:
+            st.markdown(f'<div style="text-align:center;font-size:0.85rem;color:#4A5568;padding:0.5rem;">{current_page} / {total_pages} 페이지</div>', unsafe_allow_html=True)
+        with pg_col3:
+            if st.button("다음 ▶", key=f"next_{src_name}", disabled=(current_page >= total_pages)):
+                st.session_state[page_key] = current_page + 1
+                st.rerun()
+
+    src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
+    st.download_button(f"📥 {src_name} 전체 CSV 다운로드 ({len(src_results)}건)", src_csv.encode("utf-8-sig"),
+        f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
 # ============================
 # 관리자 모드 버튼 & 로그인
@@ -1289,10 +1451,12 @@ with st.sidebar:
 # ============================
 # 분석 실행
 # ============================
+if stop_btn:
+    st.session_state.pop("analysis_results", None)
+    st.warning("분석이 중지되었습니다.")
+    st.stop()
+
 if run_btn:
-    if stop_btn:
-        st.warning("분석이 중지되었습니다.")
-        st.stop()
     keywords_raw = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()][:3]
     if not keywords_raw:
         st.error("검색어를 최소 1개 입력해주세요."); st.stop()
@@ -1327,18 +1491,11 @@ if run_btn:
     prog_text = st.empty()
     all_items = []; collect_log = []
 
-    def _fetch(task):
-        tp, kw, label = task
-        if tp == "blog": return label, kw, collect_naver_paged(kw, "blog", display_count)
-        if tp == "cafe": return label, kw, collect_cafe_paged(kw, display_count)
-        if tp == "yt":   return label, kw, search_youtube(kw, max_results=min(display_count, 50))
-        return label, kw, []
 
-    import concurrent.futures
     total_tasks = len(collect_tasks)
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(_fetch, t): t for t in collect_tasks}
+        futures = {executor.submit(_fetch, t, display_count): t for t in collect_tasks}
         for fut in concurrent.futures.as_completed(futures):
             label, kw, items = fut.result()
             all_items.extend(items)
@@ -1355,10 +1512,7 @@ if run_btn:
         if lnk not in seen: seen.add(lnk); unique_items.append(item)
 
     before_rel = len(unique_items)
-    unique_items = [
-        it for it in unique_items
-        if it.get("출처") == "카페" or is_daiso_related(it)
-    ]
+    unique_items = [it for it in unique_items if is_daiso_related(it)]
     rel_excluded = before_rel - len(unique_items)
 
     before_promo = len(unique_items)
@@ -1367,17 +1521,6 @@ if run_btn:
 
     unique_items = [it for it in unique_items if not is_admin_excluded(it)]
 
-    USIM_EXCLUDE_KW = [
-        "유심","USIM","유심칩","유심카드","심카드","SIM카드",
-        "통신사","SKT","KT","LGU+","알뜰폰","eSIM","이심",
-        "매장 옆","매장앞","매장 앞","매장 옆","옆 매장","옆가게","옆 매장",
-        "유심기변","유심 기변","유심교체","유심 교체","유심 변경","유심변경",
-        "해외유심","해외 유심","로밍유심","로밍 유심","글로벌유심","글로벌 유심",
-        "다이소유심","다이소 유심","다이소심카드","다이소 심카드",
-    ]
-    def is_usim_related(it):
-        text = (clean_text(it.get("title","")) + " " + clean_text(it.get("description",""))).upper()
-        return any(kw.upper() in text for kw in USIM_EXCLUDE_KW)
 
     before_usim  = len(unique_items)
     unique_items = [it for it in unique_items if not is_usim_related(it)]
@@ -1477,7 +1620,12 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
     results    = st.session_state["analysis_results"]
     start_date = st.session_state["analysis_start_date"]
     end_date   = st.session_state["analysis_end_date"]
-    tab_dash, tab_blog, tab_cafe, tab_yt = st.tabs(["📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"]) 
+    _tab_labels = ["📊 대시보드", "📝 블로그", "☕ 카페", "▶ 유튜브"]
+    if st.session_state.get("admin_mode"):
+        _tab_labels.append("🛡 관리자")
+    _tabs = st.tabs(_tab_labels)
+    tab_dash, tab_blog, tab_cafe, tab_yt = _tabs[0], _tabs[1], _tabs[2], _tabs[3]
+    tab_admin = _tabs[4] if st.session_state.get("admin_mode") else None
     
     total = len(results)
     pos   = sum(1 for r in results if r["감성"]=="긍정")
@@ -1626,120 +1774,12 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             st.download_button("📥 CSV 다운로드", csv.encode("utf-8-sig"),
                 f"ISSUE_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
     
-    def render_detail_tab(src_results, src_name):
-        if not src_results:
-            st.info(f"{src_name} 수집 결과가 없습니다."); return
-        t  = len(src_results)
-        p  = sum(1 for r in src_results if r["감성"]=="긍정")
-        n  = sum(1 for r in src_results if r["감성"]=="부정")
-        ne = sum(1 for r in src_results if r["감성"]=="중립")
-    
-        c1, c2, c3, c4 = st.columns(4)
-        for col, cls, lbl, val, ic_txt in [
-            (c1,"total","전체",str(t),"전체"),
-            (c2,"pos","긍정",str(p),"긍정"),
-            (c3,"neg","부정",str(n),"부정"),
-            (c4,"neu","중립",str(ne),"중립"),
-        ]:
-            with col:
-                st.markdown(f"""
-                <div class="metric-card {cls}">
-                    <div class="metric-label">
-                        <span class="metric-icon {cls}" style="color:#FFFFFF !important;">{ic_txt}</span>{lbl}
-                    </div>
-                    <div class="metric-value">{val}</div>
-                    <div class="metric-pct">{round(int(val)/t*100) if t else 0}%</div>
-                </div>""", unsafe_allow_html=True)
-    
-        st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
-    
-        sort_opt = st.selectbox("정렬", ["부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key=f"sort_{src_name}", label_visibility="collapsed")
-        if sort_opt == "부정 높은순":
-            src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 0, reverse=True)
-        elif sort_opt == "부정 낮은순":
-            src_results = sorted(src_results, key=lambda x: x.get("확신도", 0) if x.get("감성") == "부정" else 100)
-        elif sort_opt == "최신 날짜순":
-            src_results = sorted(src_results, key=lambda x: x.get("날짜", ""), reverse=True)
-        elif sort_opt == "오래된 날짜순":
-            src_results = sorted(src_results, key=lambda x: x.get("날짜", ""))
-    
-        st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과 ({len(src_results)}건)</span></div>', unsafe_allow_html=True)
-    
-        PAGE_SIZE = 20
-        total_pages = (len(src_results) - 1) // PAGE_SIZE + 1
-        page_key = f"page_{src_name}"
-        if page_key not in st.session_state:
-            st.session_state[page_key] = 1
-        current_page = st.session_state[page_key]
-    
-        start_idx = (current_page - 1) * PAGE_SIZE
-        end_idx = start_idx + PAGE_SIZE
-        page_results = src_results[start_idx:end_idx]
-    
-        for idx, r in enumerate(page_results):
-            _b     = SENT_BADGE.get(r["감성"], "")
-            _sub   = ('<span class="badge-sub">🗂 ' + r["소분류"]   + '</span>') if r.get("소분류")   else ""
-            _code  = ('<span class="badge-sub">🔢 ' + r["품번"]     + '</span>') if r.get("품번")     else ""
-            _name  = ('<span>🏷 '  + r["품명"]     + '</span>') if r.get("품명")     else ""
-            _price = ('<span>💰 ' + r["가격언급"] + '</span>') if r.get("가격언급") else ""
-            _badge = '<span class="' + _b + '">' + r["감성"] + ' ' + fmt_score(r["확신도"]) + '</span>'
-            _reason = ('<div style="font-size:0.75rem;color:#64748B;margin-top:0.3rem;padding-left:0.5rem;border-left:2px solid #E2E8F0;">💬 ' + r["reason"] + '</div>') if r.get("reason") else ""
-            _title = r["title"] or "(제목 없음)"
-            if st.session_state.get("admin_mode"):
-                col_chk, col_card = st.columns([0.3, 9.7])
-                with col_chk:
-                    st.checkbox("", key=f"chk_{src_name}_{current_page}_{idx}", label_visibility="collapsed")
-                with col_card:
-                    st.markdown(
-                        '<div class="result-card"><div class="result-title">'
-                        '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
-                        '</div><div class="result-meta">'
-                        '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
-                        + _sub + _code + _name + _price + _badge +
-                        '</div>' + _reason + '</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(
-                    '<div class="result-card"><div class="result-title">'
-                    '<a href="' + r["link"] + '" target="_blank" style="color:#1A202C;text-decoration:none;">' + _title + '</a>'
-                    '</div><div class="result-meta">'
-                    '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
-                    + _sub + _code + _name + _price + _badge +
-                    '</div>' + _reason + '</div>', unsafe_allow_html=True)
-    
-        if st.session_state.get("admin_mode"):
-            checked_urls = [page_results[i]["link"] for i in range(len(page_results))
-                           if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
-            if st.button(f"🚫 선택한 글 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
-                for url in checked_urls:
-                    append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
-                st.session_state["analysis_results"] = [
-                    r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
-                ]
-                st.success(f"✅ {len(checked_urls)}건 제외 완료")
-                st.rerun()
-    
-        if total_pages > 1:
-            pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
-            with pg_col1:
-                if st.button("◀ 이전", key=f"prev_{src_name}", disabled=(current_page <= 1)):
-                    st.session_state[page_key] = current_page - 1
-                    st.rerun()
-            with pg_col2:
-                st.markdown(f'<div style="text-align:center;font-size:0.85rem;color:#4A5568;padding:0.5rem;">{current_page} / {total_pages} 페이지</div>', unsafe_allow_html=True)
-            with pg_col3:
-                if st.button("다음 ▶", key=f"next_{src_name}", disabled=(current_page >= total_pages)):
-                    st.session_state[page_key] = current_page + 1
-                    st.rerun()
-    
-        src_csv = pd.DataFrame(src_results).to_csv(index=False, encoding="utf-8-sig")
-        st.download_button(f"📥 {src_name} 전체 CSV 다운로드 ({len(src_results)}건)", src_csv.encode("utf-8-sig"),
-            f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
     
     with tab_blog:
-        render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그")
+        render_detail_tab([r for r in results if r["출처"]=="블로그"], "블로그", start_date, end_date)
     
     with tab_cafe:
-        render_detail_tab([r for r in results if r["출처"]=="카페"], "카페")
+        render_detail_tab([r for r in results if r["출처"]=="카페"], "카페", start_date, end_date)
     
     with tab_yt:
         yt_results = [r for r in results if r["출처"]=="유튜브"]
@@ -1770,7 +1810,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
                         <div class="metric-pct">{round(int(val)/yt_t*100) if yt_t else 0}%</div>
                     </div>""", unsafe_allow_html=True)
     
-            yt_sort_opt = st.selectbox("정렬", ["조회수 높은순", "부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key="sort_yt", label_visibility="collapsed")
+            yt_sort_opt = st.radio("정렬", ["조회수 높은순", "부정 높은순", "부정 낮은순", "최신 날짜순", "오래된 날짜순"], key="sort_yt", horizontal=True, label_visibility="collapsed")
             if yt_sort_opt == "조회수 높은순":
                 yt_sorted = sorted(yt_results, key=lambda x: x.get("views") or 0, reverse=True)
             elif yt_sort_opt == "부정 높은순":
@@ -1853,90 +1893,90 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             st.download_button(f"📥 유튜브 전체 CSV 다운로드 ({len(yt_results)}건)", yt_csv.encode("utf-8-sig"),
                 f"ISSUE_유튜브_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
-# ============================
-# 관리자 패널 (분석 결과 유무와 무관하게 항상 표시)
-# ============================
-if st.session_state.get("admin_mode"):
-    st.markdown("---")
-    st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 1rem;">{icon("🛡")} <span style="font-size:0.95rem;font-weight:600;">관리자 — 키워드 / URL 관리</span></div>', unsafe_allow_html=True)
+    # ============================
+    # 관리자 탭 (탭 내부에 배치)
+    # ============================
+    if tab_admin is not None:
+        with tab_admin:
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:0 0 1rem;">{icon("🛡")} <span style="font-size:0.95rem;font-weight:600;">관리자 — 키워드 / URL 관리</span></div>', unsafe_allow_html=True)
 
-    adm1, adm2 = st.columns(2)
+            adm1, adm2 = st.columns(2)
 
-    with adm1:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('**➕ 새 항목 등록**')
+            with adm1:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown('**➕ 새 항목 등록**')
 
-        _kw_type_map = {"제외 키워드": "exclude", "부정 키워드": "neg", "긍정 키워드": "pos", "홍보성 멘트": "promo"}
-        kw_type_label = st.selectbox("유형 선택", list(_kw_type_map.keys()), key="admin_kw_type2")
-        kw_type = _kw_type_map[kw_type_label]
+                _kw_type_map = {"제외 키워드": "exclude", "부정 키워드": "neg", "긍정 키워드": "pos", "홍보성 멘트": "promo"}
+                kw_type_label = st.selectbox("유형 선택", list(_kw_type_map.keys()), key="admin_kw_type2")
+                kw_type = _kw_type_map[kw_type_label]
 
-        new_kw = st.text_input("키워드 입력", key="admin_new_kw2", placeholder="추가할 키워드 또는 문구 입력")
-        if st.button("➕ 키워드 시트에 추가", key="admin_add_kw2", use_container_width=True) and new_kw.strip():
-            existing = load_keywords_from_sheet().get(kw_type, [])
-            if new_kw.strip() in existing:
-                st.warning("⚠ 이미 등록된 단어입니다.")
-            else:
-                append_keyword_to_sheet(kw_type, new_kw.strip())
-                if kw_type == "exclude":
-                    st.session_state["admin_exclude_kws"].append(new_kw.strip())
-                st.success(f"✅ [{kw_type_label}] '{new_kw.strip()}' 저장 완료")
-                st.rerun()
+                new_kw = st.text_input("키워드 입력", key="admin_new_kw2", placeholder="추가할 키워드 또는 문구 입력")
+                if st.button("➕ 키워드 시트에 추가", key="admin_add_kw2", use_container_width=True) and new_kw.strip():
+                    existing = load_keywords_from_sheet().get(kw_type, [])
+                    if new_kw.strip() in existing:
+                        st.warning("⚠ 이미 등록된 단어입니다.")
+                    else:
+                        append_keyword_to_sheet(kw_type, new_kw.strip())
+                        if kw_type == "exclude":
+                            st.session_state["admin_exclude_kws"].append(new_kw.strip())
+                        st.success(f"✅ [{kw_type_label}] '{new_kw.strip()}' 저장 완료")
+                        st.rerun()
 
-        st.markdown("---")
-        new_url = st.text_input("제외 URL 입력", key="admin_new_url", placeholder="https://...")
-        url_reason = st.text_input("제외 사유", key="admin_url_reason", placeholder="(선택) 사유 입력")
-        if st.button("➕ URL 시트에 추가", key="admin_add_url", use_container_width=True) and new_url.strip():
-            if new_url.strip() in EXCLUDED_URLS_FROM_SHEET:
-                st.warning("⚠ 이미 등록된 URL입니다.")
-            else:
-                append_excluded_url_to_sheet(new_url.strip(), url_reason.strip() or "관리자 수동 제외")
-                st.success(f"✅ URL 제외 등록 완료")
-                st.rerun()
+                st.markdown("---")
+                new_url = st.text_input("제외 URL 입력", key="admin_new_url", placeholder="https://...")
+                url_reason = st.text_input("제외 사유", key="admin_url_reason", placeholder="(선택) 사유 입력")
+                if st.button("➕ URL 시트에 추가", key="admin_add_url", use_container_width=True) and new_url.strip():
+                    if new_url.strip() in EXCLUDED_URLS_FROM_SHEET:
+                        st.warning("⚠ 이미 등록된 URL입니다.")
+                    else:
+                        append_excluded_url_to_sheet(new_url.strip(), url_reason.strip() or "관리자 수동 제외")
+                        st.success(f"✅ URL 제외 등록 완료")
+                        st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-    with adm2:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('**📋 현재 시트 등록 현황**')
+            with adm2:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.markdown('**📋 현재 시트 등록 현황**')
 
-        sheet_kw = load_keywords_from_sheet()
+                sheet_kw = load_keywords_from_sheet()
 
-        with st.expander(f"🚫 제외 키워드 ({len(sheet_kw.get('exclude', []))}건)", expanded=False):
-            if sheet_kw.get("exclude"):
-                for kw in sheet_kw["exclude"]:
-                    st.markdown(f'<span style="font-size:0.8rem;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
-            else:
-                st.caption("등록된 항목 없음")
+                with st.expander(f"🚫 제외 키워드 ({len(sheet_kw.get('exclude', []))}건)", expanded=False):
+                    if sheet_kw.get("exclude"):
+                        for kw in sheet_kw["exclude"]:
+                            st.markdown(f'<span style="font-size:0.8rem;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
+                    else:
+                        st.caption("등록된 항목 없음")
 
-        with st.expander(f"👎 부정 키워드 ({len(sheet_kw.get('neg', []))}건)", expanded=False):
-            if sheet_kw.get("neg"):
-                for kw in sheet_kw["neg"]:
-                    st.markdown(f'<span style="font-size:0.8rem;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
-            else:
-                st.caption("등록된 항목 없음")
+                with st.expander(f"👎 부정 키워드 ({len(sheet_kw.get('neg', []))}건)", expanded=False):
+                    if sheet_kw.get("neg"):
+                        for kw in sheet_kw["neg"]:
+                            st.markdown(f'<span style="font-size:0.8rem;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
+                    else:
+                        st.caption("등록된 항목 없음")
 
-        with st.expander(f"👍 긍정 키워드 ({len(sheet_kw.get('pos', []))}건)", expanded=False):
-            if sheet_kw.get("pos"):
-                for kw in sheet_kw["pos"]:
-                    st.markdown(f'<span style="font-size:0.8rem;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
-            else:
-                st.caption("등록된 항목 없음")
+                with st.expander(f"👍 긍정 키워드 ({len(sheet_kw.get('pos', []))}건)", expanded=False):
+                    if sheet_kw.get("pos"):
+                        for kw in sheet_kw["pos"]:
+                            st.markdown(f'<span style="font-size:0.8rem;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
+                    else:
+                        st.caption("등록된 항목 없음")
 
-        with st.expander(f"📢 홍보성 멘트 ({len(sheet_kw.get('promo', []))}건)", expanded=False):
-            if sheet_kw.get("promo"):
-                for kw in sheet_kw["promo"]:
-                    st.markdown(f'<span style="font-size:0.8rem;background:#FEFCE8;color:#CA8A04;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
-            else:
-                st.caption("등록된 항목 없음")
+                with st.expander(f"📢 홍보성 멘트 ({len(sheet_kw.get('promo', []))}건)", expanded=False):
+                    if sheet_kw.get("promo"):
+                        for kw in sheet_kw["promo"]:
+                            st.markdown(f'<span style="font-size:0.8rem;background:#FEFCE8;color:#CA8A04;padding:2px 8px;border-radius:4px;margin:2px;">{kw}</span>', unsafe_allow_html=True)
+                    else:
+                        st.caption("등록된 항목 없음")
 
-        with st.expander(f"🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)", expanded=False):
-            if EXCLUDED_URLS_FROM_SHEET:
-                for url in list(EXCLUDED_URLS_FROM_SHEET)[:50]:
-                    st.markdown(f'<span style="font-size:0.72rem;color:#718096;word-break:break-all;">{url}</span>', unsafe_allow_html=True)
-            else:
-                st.caption("등록된 항목 없음")
+                with st.expander(f"🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)", expanded=False):
+                    if EXCLUDED_URLS_FROM_SHEET:
+                        for url in list(EXCLUDED_URLS_FROM_SHEET)[:50]:
+                            st.markdown(f'<span style="font-size:0.72rem;color:#718096;word-break:break-all;">{url}</span>', unsafe_allow_html=True)
+                    else:
+                        st.caption("등록된 항목 없음")
 
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("""
 <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
