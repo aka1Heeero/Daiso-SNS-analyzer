@@ -807,14 +807,14 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int, exclude_w
             for it in roberta_output:
                 lbl = LABEL_MAP.get(it["label"])
                 if lbl:
-                    votes[lbl] += it["score"] * 2.0
+                    votes[lbl] += it["score"] * 1.8
                     if lbl == "부정":
                         roberta_neg_prob = it["score"]
         except Exception:
             pass
 
     rule_lbl, rule_sc = rule_based(full_text, exclude_words=exclude)
-    votes[rule_lbl] += rule_sc * 1.2
+    votes[rule_lbl] += rule_sc * 1.5
 
     total = sum(votes.values())
     if total == 0:
@@ -1686,11 +1686,10 @@ with st.sidebar:
         • <code>55~65%</code> → 권장 (정확도 균형)<br>
         • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
         <b>📌 키워드 직접 추가</b><br>
-        관리자 모드에서 [긍정/부정] 단어를 추가하면 해당 단어가 포함된 글을 가중처리합니다.
-        관리자 모드에서 [홍보성] 단어 추가 시 홍보성으로 판단해 분석대상에서 제외합니다.<br><br>
+        관리자 모드에서 [긍정/부정/홍보성] 단어를 추가하면 해당 단어가 포함된 글을 처리합니다.<br><br>
         <b>📌 현재 AI 모델 가중치 </b><br>
-        • KLUE-RoBERTa 가중치: <code>* 2.0</code> (메인 모델)<br>
-        • Rule-Base: <code>* 1.2</code> (키워드 보강)<br>
+        • KLUE-RoBERTa 가중치: <code>* 1.8</code> (메인 모델)<br>
+        • Rule-Base: <code>* 1.5</code> (키워드 보강)<br>
     </div>
     """, unsafe_allow_html=True)
 
