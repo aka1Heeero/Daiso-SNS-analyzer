@@ -11,3 +11,4 @@ sentencepiece>=0.1.99
 protobuf>=4.25.0
 onnxruntime>=1.17.0
 optimum>=1.17.0
+torchvision>=0.17.0
