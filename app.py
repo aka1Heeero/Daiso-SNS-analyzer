@@ -274,7 +274,7 @@ html, body, .stApp {
     color: var(--primary) !important;
     text-transform: uppercase; letter-spacing: 0.07em;
 }
-.sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.1rem; display: block; line-height: 1.3; padding-bottom: 0; }
+.sb-hint { font-size: 0.62rem; color: var(--text3); margin-top: -0.5rem; margin-bottom: 0; display: block; line-height: 1.2; padding-bottom: 0; }
 
 /* ── 사이드바 요소 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stNumberInput"],
@@ -1764,7 +1764,6 @@ with st.sidebar:
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
 
-    st.markdown("<div style='margin-top:-0.2rem'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         run_btn = st.button("분석 시작", use_container_width=True)
