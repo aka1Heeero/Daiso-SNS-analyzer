@@ -1720,8 +1720,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div style="margin-top:0.2rem"></div>', unsafe_allow_html=True)
-
     dc1, dc2 = st.columns(2, gap="small")
     with dc1:
         st.markdown('<span class="date-label">시작일</span>', unsafe_allow_html=True)
@@ -1766,7 +1764,7 @@ with st.sidebar:
         help="AI가 이 수치 이상의 확신도로 부정 판정 시에만 부정으로 등록"
     )
 
-    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:0.2rem'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         run_btn = st.button("분석 시작", use_container_width=True)
@@ -1780,9 +1778,9 @@ with st.sidebar:
     </div>
     <div class="param-guide-box">
         <b>📌 감성 파라미터 조정</b><br>
-        • <code>40~50%</code> → 민감하게 수집 (부정 多)<br>
-        • <code>55~65%</code> → 권장 (균형)<br>
-        • <code>70%+</code> → 엄격 (확실한 부정)<br><br>
+        • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
+        • <code>55~65%</code> → 권장 (정확도 균형)<br>
+        • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
         <b>📌 키워드 직접 추가</b><br>
         관리자 모드에서 [긍정/부정/홍보성] 단어를 추가하면 해당 단어가 포함된 글을 처리합니다.<br><br>
         <b>📌 현재 AI 모델 가중치 </b><br>
