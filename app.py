@@ -1780,9 +1780,9 @@ with st.sidebar:
     </div>
     <div class="param-guide-box">
         <b>📌 감성 파라미터 조정</b><br>
-        • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
-        • <code>55~65%</code> → 권장 (정확도 균형)<br>
-        • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
+        • <code>40~50%</code> → 민감하게 수집 (부정 多)<br>
+        • <code>55~65%</code> → 권장 (균형)<br>
+        • <code>70%+</code> → 엄격 (확실한 부정)<br><br>
         <b>📌 키워드 직접 추가</b><br>
         관리자 모드에서 [긍정/부정/홍보성] 단어를 추가하면 해당 단어가 포함된 글을 처리합니다.<br><br>
         <b>📌 현재 AI 모델 가중치 </b><br>
