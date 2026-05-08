@@ -389,6 +389,20 @@ hr { border: none; border-top: 1px solid var(--border) !important; margin: 1rem 
 #MainMenu, footer { visibility: hidden; }
 [data-testid="collapsedControl"] { visibility: visible !important; display: block !important; }
 
+/* ── 골드셋 버튼 (흰색+검은 테두리) ── */
+button[kind="secondary"] {
+    background: #FFFFFF !important;
+    color: #1A202C !important;
+    border: 1.5px solid #2D3748 !important;
+    box-shadow: none !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+}
+button[kind="secondary"]:hover {
+    background: #F7FAFC !important;
+    border-color: #1A202C !important;
+}
+
 .badge-coming {
     display: inline-flex; align-items: center; gap: 0.3rem;
     background: #F1F5F9; color: #64748B;
@@ -771,16 +785,46 @@ PROMO_PATTERNS = [
 
 TITLE_PROMO_KW = ["추천", "하울", "꿀템", "인생템", "갓성비", "득템", "베스트", "추천템"]
 
-# 구글시트 키워드 병합
-NEGATIVE_KW = list(set(NEGATIVE_KW + _sheet_kw.get("neg", [])))
-POSITIVE_KW = list(set(POSITIVE_KW + _sheet_kw.get("pos", [])))
+# 구글시트 키워드 (단순 문자열) + 골드셋 키워드
+_SHEET_NEG_KW = _sheet_kw.get("neg", [])
+_SHEET_POS_KW = _sheet_kw.get("pos", [])
 PROMO_KW    = list(set(PROMO_KW + _sheet_kw.get("promo", [])))
 SHEET_EXCLUDE_KW = _sheet_kw.get("exclude", [])
 
-# 골드셋에서 자동 추출된 키워드 병합
 _goldset_kw = extract_goldset_keywords()
-NEGATIVE_KW = list(set(NEGATIVE_KW + _goldset_kw.get("부정", [])))
-POSITIVE_KW = list(set(POSITIVE_KW + _goldset_kw.get("긍정", [])))
+_GOLDSET_NEG_KW = _goldset_kw.get("부정", [])
+_GOLDSET_POS_KW = _goldset_kw.get("긍정", [])
+
+# 통합 매칭 함수
+def count_negative(text, exclude_words=None):
+    exclude = exclude_words or []
+    cnt = 0
+    for p in NEGATIVE_PATTERNS:
+        m = re.search(p, text)
+        if m and m.group() not in exclude:
+            cnt += 1
+    for kw in _SHEET_NEG_KW + _GOLDSET_NEG_KW:
+        if kw in text and kw not in exclude:
+            cnt += 1
+    return cnt
+
+def count_positive(text, exclude_words=None):
+    exclude = exclude_words or []
+    cnt = 0
+    for p in POSITIVE_PATTERNS:
+        m = re.search(p, text)
+        if m and m.group() not in exclude:
+            cnt += 1
+    for kw in _SHEET_POS_KW + _GOLDSET_POS_KW:
+        if kw in text and kw not in exclude:
+            cnt += 1
+    return cnt
+
+def has_negative(text):
+    return count_negative(text) > 0
+
+def has_positive(text):
+    return count_positive(text) > 0
 
 def is_promotional(item: dict) -> bool:
     title = clean_text(item.get("title", ""))
@@ -788,7 +832,7 @@ def is_promotional(item: dict) -> bool:
     full  = title + " " + desc
     promo_hit = sum(1 for kw in PROMO_KW if kw in full)
     pattern_hit = sum(1 for p in PROMO_PATTERNS if re.search(p, full))
-    neg_hit = sum(1 for kw in NEGATIVE_KW if kw in full)
+    neg_hit = count_negative(full)
     title_promo = sum(1 for kw in TITLE_PROMO_KW if kw in title)
     if (promo_hit >= 1 or pattern_hit >= 1 or title_promo >= 1) and neg_hit <= 1:
         return True
@@ -803,21 +847,20 @@ LABEL_MAP = {
 }
 
 def rule_based(text: str, exclude_words=None):
-    exclude = exclude_words or []
-    neg = sum(1 for kw in NEGATIVE_KW if kw in text and kw not in exclude)
-    pos = sum(1 for kw in POSITIVE_KW if kw in text and kw not in exclude)
-    # 다이소 맥락 부정 가중: 다이소 언급 + 부정 키워드가 동시에 있으면 부정 강화
+    neg = count_negative(text, exclude_words)
+    pos = count_positive(text, exclude_words)
+    # 다이소 맥락 부정 가중
     daiso_in_text = any(v in text for v in DAISO_VARIANTS)
     if daiso_in_text and neg > 0:
-        neg += 1  # 다이소 맥락 보너스
+        neg += 1
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
 
 def get_reason_sentence(full_text: str, sentiment: str) -> str:
     """감성 판단 근거가 되는 문장 한 줄 추출."""
-    kw_list = NEGATIVE_KW if sentiment == "부정" else POSITIVE_KW if sentiment == "긍정" else []
-    if not kw_list:
+    patterns = NEGATIVE_PATTERNS if sentiment == "부정" else POSITIVE_PATTERNS if sentiment == "긍정" else []
+    if not patterns:
         return ""
     sentences = re.split(r'[.!?\n]+', full_text)
     best_sent, best_cnt = "", 0
@@ -827,7 +870,7 @@ def get_reason_sentence(full_text: str, sentiment: str) -> str:
             continue
         if sentiment == "부정" and "다이소" not in full_text and "다이소" not in s:
             continue
-        cnt = sum(1 for kw in kw_list if kw in s)
+        cnt = sum(1 for p in patterns if re.search(p, s))
         if cnt > best_cnt:
             best_cnt = cnt
             best_sent = s
@@ -859,7 +902,7 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int, exclude_w
         return "중립", 50, ""
     best  = max(votes, key=votes.get)
     score = round(votes[best] / total * 100)
-    neg_kw_cnt = sum(1 for kw in NEGATIVE_KW if kw in full_text and kw not in exclude)
+    neg_kw_cnt = count_negative(full_text, exclude)
 
     if neg_kw_cnt >= 3:
         return "부정", max(score, 75), get_reason_sentence(full_text, "부정")
@@ -977,10 +1020,10 @@ def is_daiso_related(item: dict) -> bool:
     # 2) 다이소 + 상품/불만 맥락이 있는지 확인
     if any(kw in raw for kw in DAISO_CONTEXT_KW):
         return True
-    # NEGATIVE_KW나 POSITIVE_KW에 해당하는 것이 있으면 통과
-    if any(kw in raw for kw in NEGATIVE_KW):
+    # NEGATIVE/POSITIVE 패턴에 해당하는 것이 있으면 통과
+    if has_negative(raw):
         return True
-    if any(kw in raw for kw in POSITIVE_KW):
+    if has_positive(raw):
         return True
     # 품명 DB 매칭이 되면 통과
     if PRODUCT_NAME_INDEX and any(item["품명"] in raw for item in PRODUCT_NAME_INDEX[:200]):
@@ -1419,19 +1462,19 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
         checked_urls = [item["link"] for _, item in checked_items]
         _sp, _g1, _g2, _g3 = st.columns([4, 2, 2, 2])
         with _g1:
-            if st.button(f"✅ 긍정({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+            if st.button(f"✅ 긍정({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for _, item in checked_items:
                     append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")+" "+item.get("link","")))
                 st.success(f"✅ {len(checked_urls)}건 긍정 골드셋 저장")
                 st.rerun()
         with _g2:
-            if st.button(f"❌ 부정({len(checked_urls)})", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+            if st.button(f"❌ 부정({len(checked_urls)})", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for _, item in checked_items:
                     append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")+" "+item.get("link","")))
                 st.success(f"✅ {len(checked_urls)}건 부정 골드셋 저장")
                 st.rerun()
         with _g3:
-            if st.button(f"🚫 제외({len(checked_urls)})", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+            if st.button(f"🚫 제외({len(checked_urls)})", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for url in checked_urls:
                     append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
                 st.session_state["analysis_results"] = [
