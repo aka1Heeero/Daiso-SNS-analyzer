@@ -9,3 +9,5 @@ gspread>=6.0.0
 google-auth>=2.28.0
 sentencepiece>=0.1.99
 protobuf>=4.25.0
+onnxruntime>=1.17.0
+optinum>=1.17.0
