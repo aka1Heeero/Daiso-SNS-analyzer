@@ -1324,7 +1324,7 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
     # ── 필터(왼쪽) + 정렬(오른쪽) ──
-    filter_col, _, sort_col = st.columns([2, 5, 4])
+    filter_col, _, sort_col = st.columns([2, 4, 4])
     with filter_col:
         current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"],key=f"filter_{src_name}", horizontal=True, label_visibility="collapsed")
     with sort_col:
