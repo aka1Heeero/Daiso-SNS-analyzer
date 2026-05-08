@@ -1467,19 +1467,19 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
         checked_urls = [item["link"] for _, item in checked_items]
         _sp, _g1, _g2, _g3 = st.columns([5, 1.5, 1.5, 1.5])
         with _g1:
-            if st.button(f"✅ 긍정({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
+            if st.button(f"✅ [긍정] AI학습({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for _, item in checked_items:
                     append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")+" "+item.get("link","")))
                 st.success(f"✅ {len(checked_urls)}건 긍정 골드셋 저장")
                 st.rerun()
         with _g2:
-            if st.button(f"❌ 부정({len(checked_urls)})", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
+            if st.button(f"❌ [부정] AI학습({len(checked_urls)})", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for _, item in checked_items:
                     append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")+" "+item.get("link","")))
                 st.success(f"✅ {len(checked_urls)}건 부정 골드셋 저장")
                 st.rerun()
         with _g3:
-            if st.button(f"🚫 제외({len(checked_urls)})", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
+            if st.button(f"🚫 학습제외({len(checked_urls)})", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for url in checked_urls:
                     append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
                 st.session_state["analysis_results"] = [
