@@ -690,45 +690,83 @@ def load_roberta():
         return None
 
 
+
 # ============================
 # 룰베이스 & 앙상블
 # ============================
-NEGATIVE_KW = [
-    "불만","짜증","별로","최악","실망","환불","불량","교환","이상해","형편없",
-    "쓰레기","구려","나빠","고장","터졌","망가","깨졌","불편","아쉬워","위험",
-    "조심","주의","문제","하자","뜯겨","냄새","오염","불결","지저분","더럽",
-    "싸구려","허접","대충","클레임","AS","환급","반품","재구매 안","비추","별점 1",
-    "별점1","1점","속았","낚였","사기","뻥","가짜","품질 나쁜","품질이 나쁜",
-    "뚜껑이 안","뚜껑이 깨","잘 안 돼","안 되는","못 쓰겠","못써","쓸모없어",
-    "수량적음","색이다름","색상상이","성능과장","원산지 불명확","색감차이",
-    "과포장","과점착","색번짐","이염","후회","별로야","별로네","글쎄","그냥저냥",
-    "생각보다 별로","기대 이하","실패","구매실패","돈낭비","돈 낭비","비싸","불합리",
-    "사지마","사지 마","추천안","추천 안","별1","1개","뒤틀","휘어","금방망가",
-    "금방 망가","오래못가","오래 못가","금방부서","금방 부서","변질","변질되","변질됐","부서지","부서졌","터지","터졌",
-    "녹았","녹았어요","녹았네요","녹이 슬음","녹이 슬었","녹이 슬었어요","녹이 슬었네요","녹이 슨","녹이 슨거","녹이 슨것",
-]
-POSITIVE_KW = [
-    "좋아요","좋았","만족","추천","재구매","최고","훌륭","완벽","편리","예뻐",
-    "가성비","합리적","대박","꿀템","강추","마음에 들","만족스럽","굿","짱",
-    "갓성비","득템","완전좋","완전 좋","행복","사랑","최애","예쁘다","예쁜",
-    "지림","지려","감탄","감동","최적","최상의","맘에 쏙","맘에 들어","맘에 들었"
-]
-
-PROMO_KW = [
-    "다이소 매장", "다이소 오픈", "다이소 신상", "다이소 신제품", "다이소 근처",
-    "다이소 위치", "다이소 영업시간", "다이소 매장 위치", "다이소 점포",
-    "다이소 방문", "다이소 주차", "다이소에서 구입", "다이소 쇼핑",
-    "홍보", "광고", "제품을 받았습니다", "제공받아", "협찬", "무료로 받",
-    "내돈내산 아닌", "리뷰어", "체험단", "서포터즈", "내돈내산아님",
-    "다이소 하울", "다이소 추천템", "다이소 인기템", "다이소 꿀템 추천",
-    "다이소 추천 아이템", "다이소 베스트", "다이소 신상품 추천","매장 옆", "매장 근처", "매장 앞", "매장 뒤", "매장 주변",
-    "도전", "챌린지", "이벤트", "할인", "세일", "쿠폰", "프로모션", "특가"
+NEGATIVE_PATTERNS = [
+    r"불만|짜증|별로|최악|실망|환불|불량|교환|형편없|쓰레기|구려",
+    r"고장|터졌|망가|깨졌|불편|아쉬워|위험|조심|주의|문제|하자",
+    r"뜯겨|냄새|오염|불결|지저분|더럽|싸구려|허접|대충",
+    r"클레임|환급|반품",
+    r"재구매\s*안|비추|속았|낚였|사기|뻥|가짜",
+    r"별점\s*1|별\s*1|1점|1개",
+    r"품질\s*(나쁜|이\s*나쁜)",
+    r"잘\s*안\s*돼|안\s*되는|못\s*쓰겠|못써|쓸모없어",
+    r"수량\s*적음|색이\s*다름|색상\s*상이|성능\s*과장|원산지\s*불명확",
+    r"색감\s*차이|과포장|과점착|색번짐|이염",
+    r"후회|실패|구매\s*실패|돈\s*낭비|불합리",
+    r"사지\s*마|추천\s*안",
+    r"뒤틀|휘어",
+    r"금방\s*(망가|부서)|오래\s*못\s*가",
+    r"변질|변질되|변질됐|부서지|부서졌",
+    r"녹았|녹이\s*슬",
+    r"생각보다\s*별로|기대\s*이하|글쎄|그냥\s*저냥",
+    r"이상해|별로야|별로네",
 ]
 
+# ── 긍정 키워드 ──────────────────────────────────────────────
+POSITIVE_PATTERNS = [
+    r"좋아요|좋았|만족|추천|재구매|최고|훌륭|완벽|편리|예뻐",
+    r"괜찮(았|네|아요|습니다)?",
+    r"가성비\s*(최고|좋|굿|짱|갓성비)?",
+    r"품질\s*(좋|굿|최고|만족|좋아|짱)",
+    r"탁월|우수|뛰어나|최상|압도적|놀랍|감탄",
+    r"만족스럽|흡족|대만족|마음에\s*든|기대\s*이상",
+    r"실망\s*없|후회\s*없|잘\s*샀|강력\s*추천|재구매\s*의사",
+    r"기쁘|즐겁|설렌|뿌듯|감동|감격|황홀|짜릿|신난",
+    r"친절|상냥|센스\s*있|배려|정성|세심|꼼꼼|믿음직|전문적",
+    r"돈값|이득|효과\s*만점|효율적|경제적|합리적",
+    r"아름답|세련|고급스럽|멋있|깔끔|심플|귀엽|화사|이쁘",
+    r"편하|사용하기\s*쉽|직관적|간편|부드럽|가볍|착용감|실용적",
+    r"강추|적극\s*추천|또\s*살|반드시\s*사야|선물하고\s*싶",
+    r"굿|대박|짱|갓|레전드|찐|꿀템|득템|최애|맘에\s*(들|쏙)",
+    r"AS가\s*완벽|응대가\s*빠르|처리가\s*빠르",
+    r"기대보다\s*훨씬|사길\s*잘했|삶의\s*질이\s*올라",
+    r"완전\s*좋|지림|지려|최적|최상의|행복|사랑",
+]
+
+# ── 홍보성 키워드 ──────────────────────────────────────────────
 PROMO_PATTERNS = [
-    r"제공.{0,5}받", r"협찬", r"체험단", r"서포터즈",
-    r"소정의\s*원고료", r"원고료.*지급", r"광고.*포함",
-    r"링크.*통해.*구매", r"할인\s*코드", r"쿠폰\s*코드",
+    r"제공.{0,5}받|협찬|체험단|서포터즈",
+    r"소정의\s*원고료|원고료.*지급|광고.*포함",
+    r"링크.*통해.*구매|할인\s*코드|쿠폰\s*코드",
+    r"#\s*(ad|광고|협찬|제공|유료)",
+    r"프로필\s*링크|바이오\s*링크|링크\s*걸어",
+    r"DM\s*(주세요|문의|으로)|댓글로\s*문의",
+    r"공\s*구|공동\s*구매|선착\s*순|한정\s*수량",
+    r"내\s*돈\s*내\s*산|솔직\s*후기|진짜\s*후기|광고\s*아님|협찬\s*아님",
+    r"오늘만\s*이\s*가격|지금만\s*할인|마감\s*임박|품절\s*임박|역대급\s*할인",
+    r"후기\s*남겨|태그\s*해|팔로우\s*하면|좋아요\s*누르면|저장\s*해",
+    r"부모님께\s*사드|선물했더니\s*좋아|온\s*가족이\s*쓰",
+    r"홍보|리뷰어|내돈내산\s*아님|무료로\s*받",
+    r"하울|추천템|인기템|꿀템\s*추천|베스트|신상품\s*추천",
+    r"도전|챌린지|이벤트|세일|프로모션|특가",
+    r"매장\s*(옆|근처|앞|뒤|주변|위치|주차|방문|영업시간)",
+    r"이웃추가|서로이웃|구독하기|댓글\s*남겨주세요|공감\s*눌러",
+    r"포스팅|블로그\s*포스트|오늘의\s*포스팅|리뷰\s*포스팅",
+    r"원고료|고료|소정의",
+    r"카페\s*회원|카페\s*가입|카페\s*링크|카페\s*공구",
+    r"공구\s*오픈|공구\s*마감|공구\s*진행중|공구\s*참여",
+    r"네이버\s*쇼핑|스마트스토어|스토어팜",
+    r"최저가\s*확인|가격\s*비교|쇼핑\s*검색",
+    r"네이버\s*체험단|레뷰|강남언니|위블|미블",
+    r"서포터즈\s*활동|서포터즈\s*선정|앰배서더",
+    r"상단\s*링크|링크\s*참고|아래\s*링크|위\s*링크",
+    r"자세한\s*내용은|더\s*보러가기|전체\s*후기는",
+    r"이상으로.*리뷰|이상.*포스팅|이상.*후기",
+    r"도움이\s*됐으면|도움이\s*되셨으면|참고가\s*됐으면",
+    r"읽어주셔서\s*감사|방문해\s*주셔서\s*감사",
 ]
 
 TITLE_PROMO_KW = ["추천", "하울", "꿀템", "인생템", "갓성비", "득템", "베스트", "추천템"]
@@ -903,6 +941,14 @@ DAISO_CONTEXT_KW = [
     "후크","선반","바구니","서랍","파일","노트","펜","스티커","봉투",
 ]
 
+# 다이소가 장소/위치로만 언급된 경우 제외
+DAISO_LOCATION_EXCLUDE = [
+    "다이소 옆","다이소 근처","다이소 앞","다이소 뒤","다이소 건너편",
+    "다이소 맞은편","다이소 위","다이소 아래","다이소 건물","다이소 빌딩",
+    "다이소 골목","다이소 사거리","다이소 교차로","다이소 버스",
+    "다이소 지하철","다이소 역","다이소 정류장",
+]
+
 def is_daiso_related(item: dict) -> bool:
     title = item.get("title", "")
     desc  = item.get("description", "")
@@ -922,6 +968,10 @@ def is_daiso_related(item: dict) -> bool:
             has_daiso = any(v in title_raw for v in DAISO_VARIANTS) or any(v.upper() in title_raw.upper() for v in DAISO_VARIANTS)
 
     if not has_daiso:
+        return False
+
+    # 1.5) 다이소가 장소/위치로만 언급된 경우 제외
+    if any(loc in raw for loc in DAISO_LOCATION_EXCLUDE):
         return False
 
     # 2) 다이소 + 상품/불만 맥락이 있는지 확인
@@ -1348,6 +1398,7 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     elif sort_opt == "오래된순":
         src_results = sorted(src_results, key=lambda x: x.get("날짜", ""))
 
+    # ── 상세 결과 헤더 ──
     st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1rem 0 0.75rem;">{icon("목록")} <span style="font-size:0.95rem;font-weight:600;">상세 결과 ({len(src_results)}건)</span></div>', unsafe_allow_html=True)
 
     PAGE_SIZE = 20
@@ -1360,6 +1411,34 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     start_idx = (current_page - 1) * PAGE_SIZE
     end_idx = start_idx + PAGE_SIZE
     page_results = src_results[start_idx:end_idx]
+
+    # ── 골드셋 버튼 (관리자, 오른쪽 상단 소형) ──
+    if st.session_state.get("admin_mode"):
+        checked_items = [(i, page_results[i]) for i in range(len(page_results))
+                        if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
+        checked_urls = [item["link"] for _, item in checked_items]
+        _sp, _g1, _g2, _g3 = st.columns([4, 2, 2, 2])
+        with _g1:
+            if st.button(f"✅ 긍정({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+                for _, item in checked_items:
+                    append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")+" "+item.get("link","")))
+                st.success(f"✅ {len(checked_urls)}건 긍정 골드셋 저장")
+                st.rerun()
+        with _g2:
+            if st.button(f"❌ 부정({len(checked_urls)})", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+                for _, item in checked_items:
+                    append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")+" "+item.get("link","")))
+                st.success(f"✅ {len(checked_urls)}건 부정 골드셋 저장")
+                st.rerun()
+        with _g3:
+            if st.button(f"🚫 제외({len(checked_urls)})", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True):
+                for url in checked_urls:
+                    append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                st.session_state["analysis_results"] = [
+                    r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
+                ]
+                st.success(f"✅ {len(checked_urls)}건 제외 완료")
+                st.rerun()
 
     for idx, r in enumerate(page_results):
         _b     = SENT_BADGE.get(r["감성"], "")
@@ -1390,34 +1469,6 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
                 '<span>🔍 ' + r["검색어"] + '</span><span>📅 ' + r["날짜"] + '</span>'
                 + _sub + _code + _name + _price + _badge +
                 '</div>' + _reason + '</div>', unsafe_allow_html=True)
-
-    if st.session_state.get("admin_mode"):
-        checked_items = [(i, page_results[i]) for i in range(len(page_results))
-                        if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
-        checked_urls = [item["link"] for _, item in checked_items]
-
-        gs_col1, gs_col2, gs_col3 = st.columns(3)
-        with gs_col1:
-            if st.button(f"✅ 긍정 골드셋 ({len(checked_urls)}건)", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0):
-                for _, item in checked_items:
-                    append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")+" "+item.get("link","")))
-                st.success(f"✅ {len(checked_urls)}건 긍정 골드셋 저장")
-                st.rerun()
-        with gs_col2:
-            if st.button(f"❌ 부정 골드셋 ({len(checked_urls)}건)", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0):
-                for _, item in checked_items:
-                    append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")+" "+item.get("link","")))
-                st.success(f"✅ {len(checked_urls)}건 부정 골드셋 저장")
-                st.rerun()
-        with gs_col3:
-            if st.button(f"🚫 선택 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
-                for url in checked_urls:
-                    append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
-                st.session_state["analysis_results"] = [
-                    r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
-                ]
-                st.success(f"✅ {len(checked_urls)}건 제외 완료")
-                st.rerun()
 
     if total_pages > 1:
         pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
