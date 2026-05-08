@@ -788,7 +788,7 @@ TITLE_PROMO_KW = ["추천", "하울", "꿀템", "인생템", "갓성비", "득�
 # 구글시트 키워드 (단순 문자열) + 골드셋 키워드
 _SHEET_NEG_KW = _sheet_kw.get("neg", [])
 _SHEET_POS_KW = _sheet_kw.get("pos", [])
-PROMO_KW    = list(set(PROMO_KW + _sheet_kw.get("promo", [])))
+PROMO_KW    = list(set(_sheet_kw.get("promo", [])))
 SHEET_EXCLUDE_KW = _sheet_kw.get("exclude", [])
 
 _goldset_kw = extract_goldset_keywords()
