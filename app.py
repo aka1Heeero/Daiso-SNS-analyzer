@@ -395,8 +395,11 @@ button[kind="secondary"] {
     color: #1A202C !important;
     border: 1.5px solid #2D3748 !important;
     box-shadow: none !important;
-    font-size: 0.75rem !important;
+    font-size: 0.65rem !important;
     font-weight: 500 !important;
+    padding: 0.25rem 0.4rem !important;
+    min-height: unset !important;
+    white-space: nowrap !important;
 }
 button[kind="secondary"]:hover {
     background: #F7FAFC !important;
@@ -990,6 +993,8 @@ DAISO_LOCATION_EXCLUDE = [
     "다이소 맞은편","다이소 위","다이소 아래","다이소 건물","다이소 빌딩",
     "다이소 골목","다이소 사거리","다이소 교차로","다이소 버스",
     "다이소 지하철","다이소 역","다이소 정류장",
+    "다이소 점포","다이소 매장","다이소 오픈","다이소 영업","다이소 위치",
+    "다이소 주차","다이소 방문","다이소 알바","다이소 직원","다이소 채용",
 ]
 
 def is_daiso_related(item: dict) -> bool:
@@ -1460,7 +1465,7 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
         checked_items = [(i, page_results[i]) for i in range(len(page_results))
                         if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
         checked_urls = [item["link"] for _, item in checked_items]
-        _sp, _g1, _g2, _g3 = st.columns([4, 2, 2, 2])
+        _sp, _g1, _g2, _g3 = st.columns([5, 1.5, 1.5, 1.5])
         with _g1:
             if st.button(f"✅ 긍정({len(checked_urls)})", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0, use_container_width=True, type="secondary"):
                 for _, item in checked_items:
