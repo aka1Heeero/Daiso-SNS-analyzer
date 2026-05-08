@@ -1515,11 +1515,11 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        "></div>
+        ">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS 분석 Platform : 고객 불만 AI감성 분석</div>
+        <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
         <div class="header-sub">네이버 블로그 · 카페 · 유튜브 &nbsp;|&nbsp; KLUE-RoBERTa + 룰베이스 앙상블</div>
     </div>
 </div>
@@ -1685,11 +1685,13 @@ with st.sidebar:
         • <code>40~50%</code> → 민감하게 수집 (부정 많이 잡힘)<br>
         • <code>55~65%</code> → 권장 (정확도 균형)<br>
         • <code>70%+</code> → 엄격 (확실한 부정만)<br><br>
-        <b>📌 긍정/부정 키워드 추가</b><br>
-        관리자 모드에서 긍정/부정 단어를 추가하면 해당 단어가 포함된 글을 가중처리합니다.<br><br>
+        <b>📌 룰베이스 키워드 직접 추가</b><br>
+        코드 내 <code>NEGATIVE_KW</code> 리스트에 단어를 추가하면 해당 단어가 포함된 글을 부정으로 가중처리합니다.<br><br>
+        <b>📌 홍보성 글 제외</b><br>
+        <code>PROMO_KW</code> 리스트에 단어 추가 시 홍보성으로 판단해 자동 제외합니다.<br><br>
         <b>📌 현재 AI 모델 가중치 </b><br>
-        • KLUE-RoBERTa-Large: <code>* 2.0</code> (메인 모델)<br>
-        • Rule-Base: <code>* 1.2</code> (키워드 보강)<br>
+        • KLUE-RoBERTa 가중치: <code>* 2.0</code> (메인 모델)<br>
+        • 룰베이스 가중치: <code>* 1.2</code> (키워드 보강)<br>
     </div>
     """, unsafe_allow_html=True)
 
