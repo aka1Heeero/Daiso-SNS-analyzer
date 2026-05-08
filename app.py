@@ -3,6 +3,7 @@ import requests
 import openpyxl
 import re
 import io
+import time
 import gspread
 import pandas as pd
 import altair as alt
@@ -273,13 +274,13 @@ html, body, .stApp {
     color: var(--primary) !important;
     text-transform: uppercase; letter-spacing: 0.07em;
 }
-.sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: -0.4rem; display: block; line-height: 1.3; padding-bottom: 0; }
+.sb-hint { font-size: 0.68rem; color: var(--text3); margin-top: 0.1rem; display: block; line-height: 1.3; padding-bottom: 0; }
 
 /* ── 사이드바 요소 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stNumberInput"],
 [data-testid="stSidebar"] [data-testid="stDateInput"],
 [data-testid="stSidebar"] .stTextArea {
-    margin-bottom: -0.5rem !important;
+    margin-bottom: 0 !important;
 }
 [data-testid="stSidebar"] .stMarkdown p {
     margin-bottom: 0 !important;
@@ -584,6 +585,49 @@ def append_excluded_url_to_sheet(url, reason="관리자 제외"):
     except Exception as e:
         st.error(f"시트 저장 실패: {e}")
 
+
+# ============================
+# 골드셋 (감성 라벨링 데이터)
+# ============================
+@st.cache_data(ttl=600)
+def load_goldset_from_sheet():
+    """구글시트 [goldset] 탭에서 라벨링 데이터 로드."""
+    try:
+        gc = _get_gspread_client()
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("goldset")
+        rows = ws.get_all_records()
+        return rows
+    except Exception:
+        return []
+
+def append_goldset_to_sheet(url, title, label, text_snippet=""):
+    """구글시트 [goldset] 탭에 라벨링 데이터 추가."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("goldset")
+        ws.append_row([url, title, label, text_snippet[:200], datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        load_goldset_from_sheet.clear()
+    except Exception as e:
+        st.error(f"골드셋 저장 실패: {e}")
+
+def extract_goldset_keywords():
+    """골드셋에서 긍정/부정 빈출 키워드 자동 추출."""
+    goldset = load_goldset_from_sheet()
+    if not goldset:
+        return {"긍정": [], "부정": []}
+    pos_texts = " ".join(r.get("text", "") for r in goldset if r.get("label") == "긍정")
+    neg_texts = " ".join(r.get("text", "") for r in goldset if r.get("label") == "부정")
+    # 2글자 이상 한글 단어 추출 후 빈도 계산
+    pos_words = Counter(re.findall(r'[가-힣]{2,}', pos_texts))
+    neg_words = Counter(re.findall(r'[가-힣]{2,}', neg_texts))
+    # 상대방에 없고 3회 이상 등장한 단어만 추출
+    pos_unique = [w for w, c in pos_words.most_common(30) if c >= 3 and neg_words.get(w, 0) <= 1]
+    neg_unique = [w for w, c in neg_words.most_common(30) if c >= 3 and pos_words.get(w, 0) <= 1]
+    return {"긍정": pos_unique[:15], "부정": neg_unique[:15]}
+
+
 # 시트에서 키워드 로드
 _sheet_kw = load_keywords_from_sheet()
 EXCLUDED_URLS_FROM_SHEET = load_excluded_urls_from_sheet()
@@ -627,8 +671,20 @@ EXCLUDE_SUBCATEGORIES = ["차", "자","커피","라면"]
 # ============================================== AI모델링 (KLUE-RoBERTa + 룰베이스)
 @st.cache_resource
 def load_roberta():
+    model_name = "Chamsol/klue-roberta-sentiment-classification"
+    # ONNX Runtime 최적화 시도 (2~3배 빠름)
     try:
-        return pipeline("text-classification", model="Chamsol/klue-roberta-sentiment-classification",
+        from optimum.onnxruntime import ORTModelForSequenceClassification
+        from transformers import AutoTokenizer
+        model = ORTModelForSequenceClassification.from_pretrained(model_name, export=True)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        return pipeline("text-classification", model=model, tokenizer=tokenizer,
+                        truncation=True, max_length=128, top_k=None)
+    except Exception:
+        pass
+    # fallback: 기본 PyTorch
+    try:
+        return pipeline("text-classification", model=model_name,
                         truncation=True, max_length=128, top_k=None, device=-1)
     except Exception:
         return None
@@ -683,6 +739,11 @@ POSITIVE_KW = list(set(POSITIVE_KW + _sheet_kw.get("pos", [])))
 PROMO_KW    = list(set(PROMO_KW + _sheet_kw.get("promo", [])))
 SHEET_EXCLUDE_KW = _sheet_kw.get("exclude", [])
 
+# 골드셋에서 자동 추출된 키워드 병합
+_goldset_kw = extract_goldset_keywords()
+NEGATIVE_KW = list(set(NEGATIVE_KW + _goldset_kw.get("부정", [])))
+POSITIVE_KW = list(set(POSITIVE_KW + _goldset_kw.get("긍정", [])))
+
 def is_promotional(item: dict) -> bool:
     title = clean_text(item.get("title", ""))
     desc  = clean_text(item.get("description", ""))
@@ -707,6 +768,10 @@ def rule_based(text: str, exclude_words=None):
     exclude = exclude_words or []
     neg = sum(1 for kw in NEGATIVE_KW if kw in text and kw not in exclude)
     pos = sum(1 for kw in POSITIVE_KW if kw in text and kw not in exclude)
+    # 다이소 맥락 부정 가중: 다이소 언급 + 부정 키워드가 동시에 있으면 부정 강화
+    daiso_in_text = any(v in text for v in DAISO_VARIANTS)
+    if daiso_in_text and neg > 0:
+        neg += 1  # 다이소 맥락 보너스
     if neg > pos:  return "부정", min(0.65 + neg * 0.08, 0.98)
     if pos > neg:  return "긍정", min(0.60 + pos * 0.08, 0.98)
     return "중립", 0.50
@@ -765,7 +830,7 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int, exclude_w
     if roberta_neg_prob >= 0.4 and neg_kw_cnt >= 2:
         return "부정", max(score, 65), get_reason_sentence(full_text, "부정")
 
-    if score < threshold and best != "중립":
+    if score < threshold and best == "부정":
         return "중립", max(score - 10, 40), ""
 
     reason = get_reason_sentence(full_text, best)
@@ -773,27 +838,103 @@ def ensemble_sentiment(roberta_output, full_text: str, threshold: int, exclude_w
 
 
 # ============================
+# 블로그 본문 크롤링 (합법적 범위)
+# ============================
+def fetch_blog_body(url: str) -> str:
+    """네이버 블로그 본문 텍스트 추출. 실패 시 빈 문자열 반환."""
+    try:
+        # 네이버 블로그 모바일 버전 (iframe 없이 본문 접근 가능)
+        if "blog.naver.com" in url:
+            parts = url.replace("https://", "").replace("http://", "").split("/")
+            if len(parts) >= 3:
+                blog_id = parts[1]
+                log_no = parts[2].split("?")[0]
+                mobile_url = f"https://m.blog.naver.com/{blog_id}/{log_no}"
+            else:
+                return ""
+        else:
+            return ""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        }
+        resp = requests.get(mobile_url, headers=headers, timeout=8)
+        if resp.status_code != 200:
+            return ""
+        # 본문 영역 추출
+        text = resp.text
+        # se-main-container 또는 post-view 영역
+        body_match = re.search(r'<div class="se-main-container">(.*?)</div>\s*</div>\s*</div>', text, re.DOTALL)
+        if not body_match:
+            body_match = re.search(r'<div class="post_ct"[^>]*>(.*?)</div>', text, re.DOTALL)
+        if not body_match:
+            body_match = re.search(r'<div class="se_component_wrap">(.*?)</div>\s*</div>', text, re.DOTALL)
+        if body_match:
+            body_html = body_match.group(1)
+        else:
+            # 전체에서 텍스트 추출 (fallback)
+            body_html = text
+        # HTML 태그 제거
+        body_text = re.sub(r'<[^>]+>', ' ', body_html)
+        body_text = re.sub(r'&[a-zA-Z]+;', ' ', body_text)
+        body_text = re.sub(r'\s+', ' ', body_text).strip()
+        return body_text[:2000]  # 최대 2000자
+    except Exception:
+        return ""
+
+
+# ============================
 # 다이소 관련성 필터
 # ============================
 DAISO_VARIANTS = ["다이소", "DAISO", "daiso"]
+
+# 다이소 상품/불만 맥락 판별용 키워드
+DAISO_CONTEXT_KW = [
+    # 상품/구매 맥락
+    "제품","상품","구매","구입","샀","사용","써봤","써보","품질","가격","원짜리",
+    "천원","이천원","삼천원","오천원","만원","리뷰","후기","언박싱","하울",
+    "개봉","포장","디자인","색상","사이즈","크기","재질","내구성","마감",
+    # 불만/칭찬 맥락 (일부)
+    "불량","고장","교환","환불","깨졌","망가","부러","터졌","좋아","만족",
+    "추천","최고","괜찮","예쁘","편리","가성비","별로","실망","후회",
+    # 상품 카테고리
+    "수납","정리","주방","욕실","문구","인테리어","공구","전자","화장품",
+    "식품","생활","세제","청소","빨래","건조","조명","충전","케이블",
+    "보관","용기","그릇","컵","접시","냄비","팬","칼","가위","테이프",
+    "후크","선반","바구니","서랍","파일","노트","펜","스티커","봉투",
+]
 
 def is_daiso_related(item: dict) -> bool:
     title = item.get("title", "")
     desc  = item.get("description", "")
     combined = title + " " + desc
-    # HTML 태그 제거 (하이라이트 포함) 후 체크
+    # HTML 태그 제거
     raw = re.sub(r'<[^>]+>', '', combined)
     raw = re.sub(r'&[a-zA-Z]+;', ' ', raw)
-    # 검색어에 다이소가 포함된 상태로 검색했으므로, 텍스트에 다이소가 있으면 통과
-    if any(v in raw for v in DAISO_VARIANTS) or any(v.upper() in raw.upper() for v in DAISO_VARIANTS):
+
+    # 1) 텍스트에 다이소가 있는지 확인
+    has_daiso = any(v in raw for v in DAISO_VARIANTS) or any(v.upper() in raw.upper() for v in DAISO_VARIANTS)
+
+    if not has_daiso:
+        # 검색어에 다이소가 있으면 제목에서 확인
+        query = item.get("검색어", "")
+        if any(v in query for v in DAISO_VARIANTS):
+            title_raw = re.sub(r'<[^>]+>', '', title)
+            has_daiso = any(v in title_raw for v in DAISO_VARIANTS) or any(v.upper() in title_raw.upper() for v in DAISO_VARIANTS)
+
+    if not has_daiso:
+        return False
+
+    # 2) 다이소 + 상품/불만 맥락이 있는지 확인
+    if any(kw in raw for kw in DAISO_CONTEXT_KW):
         return True
-    # 검색어 자체에 다이소가 있으면 (build_naver_query가 자동 추가) 검색어 필드로 판단
-    query = item.get("검색어", "")
-    if any(v in query for v in DAISO_VARIANTS):
-        # 제목에서 태그 제거 후 다이소 확인
-        title_raw = re.sub(r'<[^>]+>', '', title)
-        if any(v in title_raw for v in DAISO_VARIANTS) or any(v.upper() in title_raw.upper() for v in DAISO_VARIANTS):
-            return True
+    # NEGATIVE_KW나 POSITIVE_KW에 해당하는 것이 있으면 통과
+    if any(kw in raw for kw in NEGATIVE_KW):
+        return True
+    if any(kw in raw for kw in POSITIVE_KW):
+        return True
+    # 품명 DB 매칭이 되면 통과
+    if PRODUCT_NAME_INDEX and any(item["품명"] in raw for item in PRODUCT_NAME_INDEX[:200]):
+        return True
     return False
 
 def build_naver_query(raw_keywords: str) -> str:
@@ -1029,11 +1170,15 @@ def is_date_like(t):
         if re.fullmatch(p, t.strip()): return True
     return bool(re.fullmatch(r'20\d{6}', t.strip()))
 
+YEAR_LIKE = {str(y) for y in range(2020, 2030)}
+
 def extract_product_code(text):
     raw_nums = re.findall(r'\b(\d{4,11})\b', text)
     codes = []
     for c in raw_nums:
         if is_date_like(c):
+            continue
+        if c in YEAR_LIKE:
             continue
         if VALID_PRODUCT_CODES and c in VALID_PRODUCT_CODES:
             codes.append(c)
@@ -1179,7 +1324,7 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
     st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
     # ── 필터(왼쪽) + 정렬(오른쪽) ──
-    filter_col, sort_col = st.columns([1, 1])
+    filter_col, sort_col = st.columns([1, 2])
     with filter_col:
         current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"], key=f"filter_{src_name}", horizontal=True, label_visibility="collapsed")
     with sort_col:
@@ -1247,16 +1392,32 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
                 '</div>' + _reason + '</div>', unsafe_allow_html=True)
 
     if st.session_state.get("admin_mode"):
-        checked_urls = [page_results[i]["link"] for i in range(len(page_results))
-                       if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
-        if st.button(f"🚫 선택한 글 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
-            for url in checked_urls:
-                append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
-            st.session_state["analysis_results"] = [
-                r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
-            ]
-            st.success(f"✅ {len(checked_urls)}건 제외 완료")
-            st.rerun()
+        checked_items = [(i, page_results[i]) for i in range(len(page_results))
+                        if st.session_state.get(f"chk_{src_name}_{current_page}_{i}")]
+        checked_urls = [item["link"] for _, item in checked_items]
+
+        gs_col1, gs_col2, gs_col3 = st.columns(3)
+        with gs_col1:
+            if st.button(f"✅ 긍정 골드셋 ({len(checked_urls)}건)", key=f"gold_pos_{src_name}_{current_page}", disabled=len(checked_urls)==0):
+                for _, item in checked_items:
+                    append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")+" "+item.get("link","")))
+                st.success(f"✅ {len(checked_urls)}건 긍정 골드셋 저장")
+                st.rerun()
+        with gs_col2:
+            if st.button(f"❌ 부정 골드셋 ({len(checked_urls)}건)", key=f"gold_neg_{src_name}_{current_page}", disabled=len(checked_urls)==0):
+                for _, item in checked_items:
+                    append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")+" "+item.get("link","")))
+                st.success(f"✅ {len(checked_urls)}건 부정 골드셋 저장")
+                st.rerun()
+        with gs_col3:
+            if st.button(f"🚫 선택 제외 ({len(checked_urls)}건)", key=f"bulk_exc_{src_name}_{current_page}", disabled=len(checked_urls)==0):
+                for url in checked_urls:
+                    append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                st.session_state["analysis_results"] = [
+                    r for r in st.session_state["analysis_results"] if r.get("link") not in checked_urls
+                ]
+                st.success(f"✅ {len(checked_urls)}건 제외 완료")
+                st.rerun()
 
     if total_pages > 1:
         pg_col1, pg_col2, pg_col3 = st.columns([1, 2, 1])
@@ -1354,11 +1515,11 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        "></div>
+        ">D</div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">다이소 고객 불만 AI분석 플랫폼</div>
+        <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
         <div class="header-sub">네이버 블로그 · 카페 · 유튜브 &nbsp;|&nbsp; KLUE-RoBERTa + 룰베이스 앙상블</div>
     </div>
 </div>
@@ -1436,7 +1597,7 @@ with st.sidebar:
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
         <div class="sb-section-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
         </div>
@@ -1510,9 +1671,9 @@ with st.sidebar:
     st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
-        run_btn = st.button("AI분석시작", use_container_width=True)
+        run_btn = st.button("분석 시작", use_container_width=True)
     with btn_col2:
-        stop_btn = st.button("분석중지", use_container_width=True)
+        stop_btn = st.button("중지", use_container_width=True)
 
     st.markdown("""
     <div class="sb-section" style="margin:0.5rem 0 0.3rem;">
@@ -1643,11 +1804,12 @@ if run_btn:
     for batch_start in range(0, total_f, BATCH):
         batch = filtered[batch_start: batch_start + BATCH]
         texts, metas = [], []
-        for item in batch:
+
+        for i, item in enumerate(batch):
             src   = item.get("출처","")
             title = clean_text(item.get("title",""))
             desc  = clean_text(item.get("description",""))
-            full  = (title + " " + desc)[:200]
+            full = (title + " " + desc)[:200]
             texts.append(full)
             metas.append((src, item, title))
 
@@ -1785,35 +1947,38 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
                     <div style="font-size:0.72rem;color:#718096;margin-top:0.2rem;font-weight:500;">{lbl}</div>
                 </div>""", unsafe_allow_html=True)
     
-        date_pos = {}
+        date_pos_week = {}
+        date_neg_week = {}
         for r in results:
-            if r["감성"] == "긍정" and r.get("날짜"):
-                day = r["날짜"][:10]
-                date_pos[day] = date_pos.get(day, 0) + 1
-    
-        date_neg_daily = {}
-        for r in results:
-            if r["감성"] == "부정" and r.get("날짜"):
-                day = r["날짜"][:10]
-                date_neg_daily[day] = date_neg_daily.get(day, 0) + 1
+            if r.get("날짜") and len(r["날짜"]) >= 10:
+                try:
+                    dt = datetime.strptime(r["날짜"][:10], "%Y-%m-%d")
+                    # 월요일 기준 주간 시작일
+                    week_start = dt - pd.Timedelta(days=dt.weekday())
+                    week_label = week_start.strftime("%m/%d") + "~"
+                    if r["감성"] == "긍정":
+                        date_pos_week[week_label] = date_pos_week.get(week_label, 0) + 1
+                    elif r["감성"] == "부정":
+                        date_neg_week[week_label] = date_neg_week.get(week_label, 0) + 1
+                except:
+                    pass
 
-        all_days = sorted(set(list(date_neg_daily.keys()) + list(date_pos.keys())))
-        if all_days:
-            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("일")} <span style="font-size:0.95rem;font-weight:600;">일자별 긍정/부정 추이</span></div>', unsafe_allow_html=True)
+        all_weeks = sorted(set(list(date_pos_week.keys()) + list(date_neg_week.keys())))
+        if all_weeks:
+            st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;margin:1.25rem 0 0.75rem;">{icon("주")} <span style="font-size:0.95rem;font-weight:600;">주간별 긍정/부정 추이</span></div>', unsafe_allow_html=True)
             chart_data = []
-            for d in all_days:
-                d_label = d[5:].replace("-", "/")
-                chart_data.append({"날짜": d_label, "건수": date_pos.get(d, 0), "감성": "긍정"})
-                chart_data.append({"날짜": d_label, "건수": date_neg_daily.get(d, 0), "감성": "부정"})
+            for w in all_weeks:
+                chart_data.append({"주간": w, "건수": date_pos_week.get(w, 0), "감성": "긍정"})
+                chart_data.append({"주간": w, "건수": date_neg_week.get(w, 0), "감성": "부정"})
             chart_df = pd.DataFrame(chart_data)
             chart = (
                 alt.Chart(chart_df)
                 .mark_line(point=True, strokeWidth=2.5)
                 .encode(
-                    x=alt.X("날짜:O", axis=alt.Axis(title="", labelAngle=-45, labelFontSize=10)),
+                    x=alt.X("주간:O", axis=alt.Axis(title="", labelAngle=-45, labelFontSize=10)),
                     y=alt.Y("건수:Q", axis=alt.Axis(title="건수", titleFontSize=11)),
                     color=alt.Color("감성:N", scale=alt.Scale(domain=["긍정","부정"], range=["#16A34A","#DC2626"]), legend=alt.Legend(title=None)),
-                    tooltip=[alt.Tooltip("날짜:O", title="날짜"), alt.Tooltip("감성:N", title="감성"), alt.Tooltip("건수:Q", title="건수")]
+                    tooltip=[alt.Tooltip("주간:O", title="주간"), alt.Tooltip("감성:N", title="감성"), alt.Tooltip("건수:Q", title="건수")]
                 )
                 .properties(height=220)
                 .configure_view(strokeWidth=0)
@@ -1923,7 +2088,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
             # ── 필터(왼쪽) + 정렬(오른쪽) ──
-            yt_fcol, yt_scol = st.columns([1, 1])
+            yt_fcol, yt_scol = st.columns([1, 2])
             with yt_fcol:
                 yt_current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"], key="filter_유튜브", horizontal=True, label_visibility="collapsed")
             with yt_scol:
@@ -1992,16 +2157,32 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
                     st.markdown(_card_html, unsafe_allow_html=True)
     
             if st.session_state.get("admin_mode"):
-                checked_yt_urls = [page_yt[i]["link"] for i in range(len(page_yt))
-                                   if st.session_state.get(f"chk_yt_{current_page_yt}_{i}")]
-                if st.button(f"🚫 선택한 글 제외 ({len(checked_yt_urls)}건)", key=f"bulk_exc_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
-                    for url in checked_yt_urls:
-                        append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
-                    st.session_state["analysis_results"] = [
-                        r for r in st.session_state["analysis_results"] if r.get("link") not in checked_yt_urls
-                    ]
-                    st.success(f"✅ {len(checked_yt_urls)}건 제외 완료")
-                    st.rerun()
+                checked_yt_items = [(i, page_yt[i]) for i in range(len(page_yt))
+                                    if st.session_state.get(f"chk_yt_{current_page_yt}_{i}")]
+                checked_yt_urls = [item["link"] for _, item in checked_yt_items]
+
+                gs_col1, gs_col2, gs_col3 = st.columns(3)
+                with gs_col1:
+                    if st.button(f"✅ 긍정 골드셋 ({len(checked_yt_urls)}건)", key=f"gold_pos_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
+                        for _, item in checked_yt_items:
+                            append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")))
+                        st.success(f"✅ {len(checked_yt_urls)}건 긍정 골드셋 저장")
+                        st.rerun()
+                with gs_col2:
+                    if st.button(f"❌ 부정 골드셋 ({len(checked_yt_urls)}건)", key=f"gold_neg_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
+                        for _, item in checked_yt_items:
+                            append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")))
+                        st.success(f"✅ {len(checked_yt_urls)}건 부정 골드셋 저장")
+                        st.rerun()
+                with gs_col3:
+                    if st.button(f"🚫 선택 제외 ({len(checked_yt_urls)}건)", key=f"bulk_exc_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
+                        for url in checked_yt_urls:
+                            append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                        st.session_state["analysis_results"] = [
+                            r for r in st.session_state["analysis_results"] if r.get("link") not in checked_yt_urls
+                        ]
+                        st.success(f"✅ {len(checked_yt_urls)}건 제외 완료")
+                        st.rerun()
     
             if total_pages_yt > 1:
                 yp1, yp2, yp3 = st.columns([1, 2, 1])
