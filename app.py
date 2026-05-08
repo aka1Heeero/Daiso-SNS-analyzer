@@ -1515,11 +1515,11 @@ st.markdown("""
             color:#0066CC; letter-spacing:0.12em;
             font-family:'Inter',sans-serif;
             line-height:1;
-        ">D</div>
+        "></div>
     </div>
     <div style="width:1px;height:36px;background:#E2E8F0;margin:0 0.25rem;flex-shrink:0;"></div>
     <div>
-        <div class="header-title">SNS Issue Finder : 고객 불만 AI 자동 분석</div>
+        <div class="header-title"> SNS 고객 불만 AI분석 Platform</div>
         <div class="header-sub">네이버 블로그 · 카페 · 유튜브 &nbsp;|&nbsp; KLUE-RoBERTa + 룰베이스 앙상블</div>
     </div>
 </div>
