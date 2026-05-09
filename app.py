@@ -2507,17 +2507,17 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             _render_badges("긍정 키워드", "👍", sheet_kw.get("pos", []), "#F0FDF4", "#16A34A")
             _render_badges("홍보성 멘트", "📢", sheet_kw.get("promo", []), "#FEFCE8", "#CA8A04")
 
-            # ── 제외 URL 뱃지 ──
-            url_list = list(EXCLUDED_URLS_FROM_SHEET)[:50]
-            url_badges = "".join(
-                f'<span style="display:inline-block;font-size:0.7rem;background:#F1F5F9;color:#475569;padding:3px 8px;border-radius:4px;margin:3px 4px;word-break:break-all;max-width:100%;">{u}</span>'
-                for u in url_list
-            ) if url_list else '<span style="font-size:0.78rem;color:#A0AEC0;">등록된 항목 없음</span>'
-            st.markdown(f'''
-            <div class="card" style="margin-bottom:0.75rem;">
-                <div style="font-size:0.82rem;font-weight:700;color:#475569;margin-bottom:0.5rem;">🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)</div>
-                <div style="display:flex;flex-wrap:wrap;gap:2px;">{url_badges}</div>
-            </div>''', unsafe_allow_html=True)
+            # ── 제외 URL (접기) ──
+            with st.expander(f"🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)", expanded=False):
+                url_list = list(EXCLUDED_URLS_FROM_SHEET)[:50]
+                if url_list:
+                    url_badges = "".join(
+                        f'<span style="display:inline-block;font-size:0.7rem;background:#F1F5F9;color:#475569;padding:3px 8px;border-radius:4px;margin:3px 4px;word-break:break-all;max-width:100%;">{u}</span>'
+                        for u in url_list
+                    )
+                    st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:2px;">{url_badges}</div>', unsafe_allow_html=True)
+                else:
+                    st.caption("등록된 항목 없음")
 
 st.markdown("""
 <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
