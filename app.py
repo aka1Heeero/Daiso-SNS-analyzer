@@ -584,11 +584,12 @@ def check_password():
     <style>
     .login-left-brand {{
         background:linear-gradient(135deg, #0052A3 0%, #0066CC 50%, #3B82F6 100%);
-        border-radius: 16px;
+        border-radius: 0;
         padding: 3rem 2rem;
         display:flex; flex-direction:column; align-items:center; justify-content:center;
-        min-height: 70vh;
+        min-height: 100vh;
         position: relative;
+        margin: -1rem;
     }}
     .login-right-text {{ color:#FFFFFF; font-size:2rem; font-weight:800; line-height:1.2; text-align:center; }}
     .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.82rem; margin-top:0.8rem; text-align:center; }}
@@ -610,8 +611,8 @@ def check_password():
         """, unsafe_allow_html=True)
     with right_col:
         st.markdown("<div style='height:15vh'></div>", unsafe_allow_html=True)
-        st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align:center;"><span class="login-brand">DAISO ISSUE FINDER</span></div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align:center;" class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
         st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
         # 3번 실패 시 잠금
