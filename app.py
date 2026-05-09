@@ -62,19 +62,19 @@ html, body, .stApp {
     font-family: 'Noto Sans KR', sans-serif !important;
 }
 
-/* ── 사이드바 (다크 네이비) ── */
+/* ── 사이드바 (밝은 파란색) ── */
 [data-testid="stSidebar"] {
-    background: var(--sidebar-bg) !important;
-    border-right: none !important;
+    background: #EBF4FF !important;
+    border-right: 1px solid #BFDBFE !important;
 }
-[data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
+[data-testid="stSidebar"] * { color: #1A202C !important; }
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] .stTextArea textarea,
 [data-testid="stSidebar"] .stNumberInput input {
-    background: #2D3748 !important;
-    border: 1px solid #4A5568 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
     border-radius: 8px !important;
-    color: #E2E8F0 !important;
+    color: #1A202C !important;
     font-family: 'Noto Sans KR', sans-serif !important;
     font-size: 0.875rem !important;
 }
@@ -82,22 +82,22 @@ html, body, .stApp {
 [data-testid="stSidebar"] .stTextArea textarea:focus,
 [data-testid="stSidebar"] .stNumberInput input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.25) !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
     outline: none !important;
 }
 
 /* ── 날짜 입력 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
-    background: #2D3748 !important;
-    border: 1px solid #4A5568 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
     border-radius: 8px !important;
-    color: #E2E8F0 !important;
+    color: #1A202C !important;
     font-size: 0.875rem !important;
     padding: 0.3rem 0.5rem !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.25) !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] {
     margin-top: 0 !important;
@@ -261,7 +261,7 @@ html, body, .stApp {
 .sb-section {
     display: flex; align-items: center; gap: 0.5rem;
     padding: 0.45rem 0.7rem;
-    background: rgba(255,255,255,0.05);
+    background: rgba(0,102,204,0.08);
     border-left: 3px solid var(--primary);
     border-radius: 0 6px 6px 0;
     margin: 0.8rem 0 0.4rem;
@@ -276,10 +276,10 @@ html, body, .stApp {
 }
 .sb-section-text {
     font-size: 0.72rem; font-weight: 700;
-    color: #93C5FD !important;
+    color: var(--primary) !important;
     text-transform: uppercase; letter-spacing: 0.07em;
 }
-.sb-hint { font-size: 0.62rem; color: #94A3B8; margin-top: -0.5rem; margin-bottom: 0; display: block; line-height: 1.2; padding-bottom: 0; }
+.sb-hint { font-size: 0.62rem; color: #64748B; margin-top: -0.5rem; margin-bottom: 0; display: block; line-height: 1.2; padding-bottom: 0; }
 
 /* ── 사이드바 요소 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stNumberInput"],
@@ -506,24 +506,13 @@ def load_users_from_sheet():
         st.error(f"⚠ users 시트 로드 실패: {e}")
         return {}
 
-def register_user_to_sheet(uid, pw, name):
-    """구글시트 [users] 탭에 새 사용자 등록."""
-    try:
-        gc = _get_gspread_client(readonly=False)
-        sh = gc.open_by_key(SHEET_ID)
-        ws = sh.worksheet("users")
-        ws.append_row([uid, pw, name, "user", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
-        load_users_from_sheet.clear()
-        return True
-    except Exception as e:
-        st.error(f"등록 실패: {e}")
-        return False
-
 def log_access(uid, name, action="login"):
     """구글시트 [access_log] 탭에 접속 기록 저장."""
     try:
-        gc = _get_gspread_client(readonly=False)
-        sh = gc.open_by_key(SHEET_ID)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key("1iZS_bBlmZaMRFfW-l6XTP5zUZzit3vxhSIogEB-ynDM")
         ws = sh.worksheet("access_log")
         ws.append_row([uid, name, action, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     except Exception:
@@ -532,14 +521,15 @@ def log_access(uid, name, action="login"):
 def change_password_in_sheet(uid, new_pw):
     """구글시트 [users] 탭에서 비밀번호 변경."""
     try:
-        gc = _get_gspread_client(readonly=False)
-        sh = gc.open_by_key(SHEET_ID)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key("1iZS_bBlmZaMRFfW-l6XTP5zUZzit3vxhSIogEB-ynDM")
         ws = sh.worksheet("users")
-        records = ws.get_all_records()
-        for idx, r in enumerate(records, 2):
-            if r.get("id", "").strip() == uid:
+        all_vals = ws.get_all_values()
+        for idx, row in enumerate(all_vals[1:], 2):
+            if row[0].strip() == uid:
                 ws.update_cell(idx, 2, new_pw)
-                load_users_from_sheet.clear()
                 return True
         return False
     except Exception:
@@ -551,8 +541,6 @@ def check_password():
 
     if "_login_fail_cnt" not in st.session_state:
         st.session_state["_login_fail_cnt"] = 0
-    if "_show_register" not in st.session_state:
-        st.session_state["_show_register"] = False
     if "_show_pw_change" not in st.session_state:
         st.session_state["_show_pw_change"] = False
 
@@ -605,9 +593,10 @@ def check_password():
     .login-right-text {{ color:#FFFFFF; font-size:2rem; font-weight:800; line-height:1.2; text-align:center; }}
     .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.82rem; margin-top:0.8rem; text-align:center; }}
     .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.2rem; }}
-    .login-main-title {{ font-size:1.3rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
+    .login-main-title {{ font-size:1.2rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
     .login-credit {{ position:absolute; bottom:1rem; right:1.2rem; font-size:0.65rem; color:rgba(255,255,255,0.5); }}
     .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
+    .login-form-wrap {{ max-width:280px; margin:0 auto; padding-top:15vh; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -622,9 +611,10 @@ def check_password():
         </div>
         """, unsafe_allow_html=True)
     with right_col:
+        st.markdown('<div class="login-form-wrap">', unsafe_allow_html=True)
         st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
-        st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
         # 3번 실패 시 잠금
         if st.session_state["_login_fail_cnt"] >= 3:
@@ -632,7 +622,7 @@ def check_password():
             st.info("📧 관리자 연락처: 데이터분석팀")
             return False
 
-        if not st.session_state["_show_register"] and not st.session_state["_show_pw_change"]:
+        if not st.session_state["_show_pw_change"]:
             # ── 로그인 화면 ──
             st.text_input("아이디", placeholder="아이디 입력", label_visibility="collapsed", key="login_id")
             st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
@@ -648,15 +638,9 @@ def check_password():
             if st.session_state.get("authenticated"):
                 st.rerun()
             st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-            bc1, bc2 = st.columns(2)
-            with bc1:
-                if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
-                    st.session_state["_show_pw_change"] = True
-                    st.rerun()
-            with bc2:
-                if st.button("📝 회원가입", use_container_width=True, type="secondary"):
-                    st.session_state["_show_register"] = True
-                    st.rerun()
+            if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
+                st.session_state["_show_pw_change"] = True
+                st.rerun()
 
         elif st.session_state["_show_pw_change"]:
             # ── 비밀번호 변경 화면 ──
@@ -684,29 +668,7 @@ def check_password():
             if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
                 st.session_state["_show_pw_change"] = False
                 st.rerun()
-
-        else:
-            # ── 회원가입 화면 ──
-            st.markdown('<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">📝 회원가입</div>', unsafe_allow_html=True)
-            reg_id = st.text_input("", placeholder="아이디 (영문/숫자)", label_visibility="collapsed", key="reg_id")
-            reg_pw = st.text_input("", type="password", placeholder="비밀번호", label_visibility="collapsed", key="reg_pw")
-            reg_pw2 = st.text_input("", type="password", placeholder="비밀번호 확인", label_visibility="collapsed", key="reg_pw2")
-            reg_name = st.text_input("", placeholder="이름", label_visibility="collapsed", key="reg_name")
-            if st.button("가입하기", use_container_width=True):
-                if not reg_id or not reg_pw or not reg_name:
-                    st.error("모든 항목을 입력해주세요.")
-                elif reg_pw != reg_pw2:
-                    st.error("비밀번호가 일치하지 않습니다.")
-                elif reg_id in users:
-                    st.error("이미 존재하는 아이디입니다.")
-                else:
-                    if register_user_to_sheet(reg_id.strip(), reg_pw.strip(), reg_name.strip()):
-                        st.success("✅ 가입 완료! 로그인해주세요.")
-                        st.session_state["_show_register"] = False
-                        st.rerun()
-            if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
-                st.session_state["_show_register"] = False
-                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     return False
 
 if not check_password():
@@ -718,7 +680,7 @@ NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
 
 # ============================================== 관리자 모드 세션 초기화
-for _k, _v in {"admin_mode": False, "admin_show_login": False, "admin_exclude_kws": []}.items():
+for _k, _v in {"admin_mode": False, "admin_exclude_kws": []}.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
@@ -1740,55 +1702,20 @@ def render_detail_tab(src_results, src_name, start_date, end_date):
         f"ISSUE_{src_name}_{start_date}_{end_date}.csv", "text/csv", use_container_width=True)
 
 # ============================
-# 관리자 모드 버튼 & 로그인
+# 관리자 모드 토글 (role=admin만 표시)
 # ============================
 admin_col1, admin_col2 = st.columns([10, 1])
 with admin_col2:
-    if st.session_state["admin_mode"]:
-        if st.button("🔓 관리자", key="admin_toggle_off"):
-            st.session_state["admin_mode"] = False
-            st.session_state["admin_show_login"] = False
-            st.rerun()
-        st.markdown('<span class="admin-badge-on">🔓 ADMIN</span>', unsafe_allow_html=True)
-    else:
-        if st.button("🔐 관리자", key="admin_toggle_on"):
-            st.session_state["admin_show_login"] = not st.session_state["admin_show_login"]
-            st.rerun()
-
-if st.session_state["admin_show_login"] and not st.session_state["admin_mode"]:
-    with st.container():
-        st.markdown("""<div class="admin-login-modal"><div class="admin-login-icon">🛡️</div><div style="font-size:1.1rem;font-weight:700;color:#7C3AED;margin-top:0.5rem;">관리자 로그인</div><div style="font-size:0.8rem;color:#718096;">관리자 전용 기능에 접근합니다</div><div style="font-size:0.72rem;color:#A0AEC0;margin-top:0.3rem;">※ 일반 로그인과 별도의 관리자 전용 비밀번호입니다</div></div>""", unsafe_allow_html=True)
-        _, mid_col, _ = st.columns([1, 2, 1])
-        with mid_col:
-            def _admin_enter():
-                pw = st.session_state.get("admin_pw_input", "")
-                if pw == ADMIN_PASSWORD:
-                    st.session_state["admin_mode"] = True
-                    st.session_state["admin_show_login"] = False
-                else:
-                    st.session_state["_admin_login_error"] = True
-
-            st.text_input(
-                "관리자 비밀번호", type="password",
-                placeholder="비밀번호 입력 후 엔터",
-                label_visibility="collapsed",
-                key="admin_pw_input",
-                on_change=_admin_enter,
-            )
-            if st.session_state.pop("_admin_login_error", False):
-                st.error("비밀번호가 틀렸습니다.")
-            # 엔터로 성공한 경우 rerun
-            if st.session_state.get("admin_mode") and st.session_state.get("admin_show_login") is False:
+    if st.session_state.get("current_user_role") == "admin":
+        if st.session_state["admin_mode"]:
+            if st.button("🔓 관리자", key="admin_toggle_off"):
+                st.session_state["admin_mode"] = False
                 st.rerun()
-            lc, cc = st.columns(2)
-            with lc:
-                if st.button("로그인", key="admin_login_confirm", use_container_width=True):
-                    _admin_enter()
-            with cc:
-                if st.button("취소", key="admin_login_cancel", use_container_width=True):
-                    st.session_state["admin_show_login"] = False
-                    st.rerun()
-    st.markdown("---")
+            st.markdown('<span class="admin-badge-on">🔓 ADMIN</span>', unsafe_allow_html=True)
+        else:
+            if st.button("🔐 관리자", key="admin_toggle_on"):
+                st.session_state["admin_mode"] = True
+                st.rerun()
 
 # ============================
 # 앱 헤더
