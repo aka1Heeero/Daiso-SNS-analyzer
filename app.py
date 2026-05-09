@@ -593,14 +593,12 @@ def check_password():
     .login-right-text {{ color:#FFFFFF; font-size:2rem; font-weight:800; line-height:1.2; text-align:center; }}
     .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.82rem; margin-top:0.8rem; text-align:center; }}
     .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.2rem; }}
-    .login-main-title {{ font-size:1.2rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
-    .login-credit {{ position:absolute; bottom:1rem; right:1.2rem; font-size:0.65rem; color:rgba(255,255,255,0.5); }}
-    .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
     .login-form-wrap {{ max-width:280px; margin:0 auto; padding-top:15vh; }}
+    .stApp {{ overflow: hidden; }}
     </style>
     """, unsafe_allow_html=True)
 
-    left_col, right_col = st.columns([1.5, 1])
+    left_col, right_col = st.columns([3, 2])
     with left_col:
         st.markdown(f"""
         <div class="login-left-brand">
@@ -611,7 +609,7 @@ def check_password():
         </div>
         """, unsafe_allow_html=True)
     with right_col:
-        st.markdown('<div class="login-form-wrap">', unsafe_allow_html=True)
+        st.markdown("<div style='height:15vh'></div>", unsafe_allow_html=True)
         st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
         st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
@@ -622,53 +620,55 @@ def check_password():
             st.info("📧 관리자 연락처: 데이터분석팀")
             return False
 
-        if not st.session_state["_show_pw_change"]:
-            # ── 로그인 화면 ──
-            st.text_input("아이디", placeholder="아이디 입력", label_visibility="collapsed", key="login_id")
-            st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
-            if st.button("로그인", use_container_width=True):
-                _try_login()
-            if st.session_state.pop("_login_empty", False):
-                st.warning("아이디와 비밀번호를 입력하세요.")
-            if st.session_state.pop("_login_error", False):
-                remain = 3 - st.session_state["_login_fail_cnt"]
-                st.error(f"아이디 또는 비밀번호가 올바르지 않습니다. (남은 시도: {remain}회)")
-                if st.session_state.get("_debug_info"):
-                    st.caption(st.session_state["_debug_info"])
-            if st.session_state.get("authenticated"):
-                st.rerun()
-            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-            if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
-                st.session_state["_show_pw_change"] = True
-                st.rerun()
+        # 입력칸을 좁게 만들기 위한 내부 컬럼
+        _pad_l, _form, _pad_r = st.columns([0.5, 2, 1])
+        with _form:
+            if not st.session_state["_show_pw_change"]:
+                # ── 로그인 화면 ──
+                st.text_input("아이디", placeholder="아이디 입력", label_visibility="collapsed", key="login_id")
+                st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
+                if st.button("로그인", use_container_width=True):
+                    _try_login()
+                if st.session_state.pop("_login_empty", False):
+                    st.warning("아이디와 비밀번호를 입력하세요.")
+                if st.session_state.pop("_login_error", False):
+                    remain = 3 - st.session_state["_login_fail_cnt"]
+                    st.error(f"아이디 또는 비밀번호가 올바르지 않습니다. (남은 시도: {remain}회)")
+                    if st.session_state.get("_debug_info"):
+                        st.caption(st.session_state["_debug_info"])
+                if st.session_state.get("authenticated"):
+                    st.rerun()
+                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
+                    st.session_state["_show_pw_change"] = True
+                    st.rerun()
 
-        elif st.session_state["_show_pw_change"]:
-            # ── 비밀번호 변경 화면 ──
-            st.markdown('<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">🔑 비밀번호 변경</div>', unsafe_allow_html=True)
-            chg_id = st.text_input("", placeholder="아이디", label_visibility="collapsed", key="chg_id")
-            chg_old = st.text_input("", type="password", placeholder="현재 비밀번호", label_visibility="collapsed", key="chg_old")
-            chg_new = st.text_input("", type="password", placeholder="새 비밀번호", label_visibility="collapsed", key="chg_new")
-            chg_new2 = st.text_input("", type="password", placeholder="새 비밀번호 확인", label_visibility="collapsed", key="chg_new2")
-            if st.button("변경하기", use_container_width=True):
-                if not chg_id or not chg_old or not chg_new:
-                    st.error("모든 항목을 입력해주세요.")
-                elif chg_new != chg_new2:
-                    st.error("새 비밀번호가 일치하지 않습니다.")
-                elif chg_id not in users:
-                    st.error("존재하지 않는 아이디입니다.")
-                elif users[chg_id]["password"] != chg_old:
-                    st.error("현재 비밀번호가 틀렸습니다.")
-                else:
-                    if change_password_in_sheet(chg_id.strip(), chg_new.strip()):
-                        st.success("✅ 비밀번호 변경 완료!")
-                        st.session_state["_show_pw_change"] = False
-                        st.rerun()
+            elif st.session_state["_show_pw_change"]:
+                # ── 비밀번호 변경 화면 ──
+                st.markdown('<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">🔑 비밀번호 변경</div>', unsafe_allow_html=True)
+                chg_id = st.text_input("", placeholder="아이디", label_visibility="collapsed", key="chg_id")
+                chg_old = st.text_input("", type="password", placeholder="현재 비밀번호", label_visibility="collapsed", key="chg_old")
+                chg_new = st.text_input("", type="password", placeholder="새 비밀번호", label_visibility="collapsed", key="chg_new")
+                chg_new2 = st.text_input("", type="password", placeholder="새 비밀번호 확인", label_visibility="collapsed", key="chg_new2")
+                if st.button("변경하기", use_container_width=True):
+                    if not chg_id or not chg_old or not chg_new:
+                        st.error("모든 항목을 입력해주세요.")
+                    elif chg_new != chg_new2:
+                        st.error("새 비밀번호가 일치하지 않습니다.")
+                    elif chg_id not in users:
+                        st.error("존재하지 않는 아이디입니다.")
+                    elif users[chg_id]["password"] != chg_old:
+                        st.error("현재 비밀번호가 틀렸습니다.")
                     else:
-                        st.error("변경 실패. 다시 시도해주세요.")
-            if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
-                st.session_state["_show_pw_change"] = False
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+                        if change_password_in_sheet(chg_id.strip(), chg_new.strip()):
+                            st.success("✅ 비밀번호 변경 완료!")
+                            st.session_state["_show_pw_change"] = False
+                            st.rerun()
+                        else:
+                            st.error("변경 실패. 다시 시도해주세요.")
+                if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
+                    st.session_state["_show_pw_change"] = False
+                    st.rerun()
     return False
 
 if not check_password():
