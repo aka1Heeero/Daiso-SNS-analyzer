@@ -4,6 +4,7 @@ import openpyxl
 import re
 import io
 import time
+import base64
 import gspread
 import pandas as pd
 import altair as alt
@@ -35,7 +36,7 @@ st.markdown("""
     --primary:    #0066CC;
     --primary-lt: #E8F1FB;
     --primary-md: #CCE0F5;
-    --bg:         #F8F9FB;
+    --bg:         #F1F5F9;
     --bg-white:   #FFFFFF;
     --border:     #E2E8F0;
     --border2:    #CBD5E1;
@@ -48,6 +49,9 @@ st.markdown("""
     --neg-bg:     #FEF2F2;
     --neu:        #CA8A04;
     --neu-bg:     #FEFCE8;
+    --sidebar-bg: #1E293B;
+    --sidebar-text: #E2E8F0;
+    --sidebar-active: #0066CC;
     --shadow:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
     --shadow-md:  0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
 }
@@ -58,19 +62,19 @@ html, body, .stApp {
     font-family: 'Noto Sans KR', sans-serif !important;
 }
 
-/* ── 사이드바 ── */
+/* ── 사이드바 (다크 네이비) ── */
 [data-testid="stSidebar"] {
-    background: var(--bg-white) !important;
-    border-right: 1px solid var(--border) !important;
+    background: var(--sidebar-bg) !important;
+    border-right: none !important;
 }
-[data-testid="stSidebar"] * { color: var(--text) !important; }
+[data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
 [data-testid="stSidebar"] .stTextInput input,
 [data-testid="stSidebar"] .stTextArea textarea,
 [data-testid="stSidebar"] .stNumberInput input {
-    background: var(--bg) !important;
-    border: 1px solid var(--border) !important;
+    background: #2D3748 !important;
+    border: 1px solid #4A5568 !important;
     border-radius: 8px !important;
-    color: var(--text) !important;
+    color: #E2E8F0 !important;
     font-family: 'Noto Sans KR', sans-serif !important;
     font-size: 0.875rem !important;
 }
@@ -78,22 +82,22 @@ html, body, .stApp {
 [data-testid="stSidebar"] .stTextArea textarea:focus,
 [data-testid="stSidebar"] .stNumberInput input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.25) !important;
     outline: none !important;
 }
 
 /* ── 날짜 입력 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stDateInput"] input {
-    background: var(--bg) !important;
-    border: 1px solid var(--border) !important;
+    background: #2D3748 !important;
+    border: 1px solid #4A5568 !important;
     border-radius: 8px !important;
-    color: var(--text) !important;
+    color: #E2E8F0 !important;
     font-size: 0.875rem !important;
     padding: 0.3rem 0.5rem !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.12) !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.25) !important;
 }
 [data-testid="stSidebar"] [data-testid="stDateInput"] {
     margin-top: 0 !important;
@@ -159,36 +163,37 @@ html, body, .stApp {
 /* ── 메트릭 카드 ── */
 .metric-card {
     flex: 1; background: var(--bg-white);
-    border: 1px solid var(--border); border-radius: 12px;
-    padding: 1.25rem 1.5rem; box-shadow: var(--shadow);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 1.2rem 1.4rem; box-shadow: var(--shadow);
     border-top: 3px solid transparent;
+    position: relative;
 }
 .metric-card.total { border-top-color: var(--primary); }
 .metric-card.pos   { border-top-color: var(--pos); }
 .metric-card.neg   { border-top-color: var(--neg); }
 .metric-card.neu   { border-top-color: var(--neu); }
 .metric-label {
-    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.5rem;
-    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.72rem; font-weight: 500;
+    color: var(--text3); margin-bottom: 0.4rem;
+    display: flex; align-items: center; justify-content: space-between;
 }
 .metric-icon {
-    width: 22px; height: 22px;
-    background: var(--primary);
-    border-radius: 6px;
+    width: 32px; height: 32px;
+    background: var(--primary-lt);
+    border-radius: 8px;
     display: inline-flex; align-items: center; justify-content: center;
-    color: #FFFFFF !important;
-    font-size: 0.68rem; font-weight: 700;
+    color: var(--primary) !important;
+    font-size: 0.75rem; font-weight: 700;
     flex-shrink: 0; line-height: 1;
 }
-.metric-icon.pos { background: var(--pos);  color: #FFFFFF !important; }
-.metric-icon.neg { background: var(--neg);  color: #FFFFFF !important; }
-.metric-icon.neu { background: var(--neu);  color: #FFFFFF !important; }
+.metric-icon.pos { background: var(--pos-bg); color: var(--pos) !important; }
+.metric-icon.neg { background: var(--neg-bg); color: var(--neg) !important; }
+.metric-icon.neu { background: var(--neu-bg); color: var(--neu) !important; }
 .metric-value {
-    font-family: 'Inter', sans-serif; font-size: 2.2rem;
-    font-weight: 600; color: var(--text); line-height: 1;
+    font-family: 'Inter', sans-serif; font-size: 2rem;
+    font-weight: 700; color: var(--text); line-height: 1; margin-top: 0.2rem;
 }
-.metric-pct { font-size: 0.78rem; color: var(--text3); margin-top: 0.3rem; }
+.metric-pct { font-size: 0.75rem; color: var(--text3); margin-top: 0.4rem; display:flex; align-items:center; gap:0.3rem; }
 
 /* ── 섹션 타이틀 아이콘 ── */
 .section-title-icon {
@@ -255,11 +260,11 @@ html, body, .stApp {
 /* ── 사이드바 섹션 헤더 ── */
 .sb-section {
     display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.55rem 0.7rem;
-    background: var(--primary-lt);
+    padding: 0.45rem 0.7rem;
+    background: rgba(255,255,255,0.05);
     border-left: 3px solid var(--primary);
     border-radius: 0 6px 6px 0;
-    margin: 1rem 0 0.5rem;
+    margin: 0.8rem 0 0.4rem;
 }
 .sb-section-icon {
     width: 20px; height: 20px;
@@ -271,10 +276,10 @@ html, body, .stApp {
 }
 .sb-section-text {
     font-size: 0.72rem; font-weight: 700;
-    color: var(--primary) !important;
+    color: #93C5FD !important;
     text-transform: uppercase; letter-spacing: 0.07em;
 }
-.sb-hint { font-size: 0.62rem; color: var(--text3); margin-top: -0.5rem; margin-bottom: 0; display: block; line-height: 1.2; padding-bottom: 0; }
+.sb-hint { font-size: 0.62rem; color: #94A3B8; margin-top: -0.5rem; margin-bottom: 0; display: block; line-height: 1.2; padding-bottom: 0; }
 
 /* ── 사이드바 요소 간격 축소 ── */
 [data-testid="stSidebar"] [data-testid="stNumberInput"],
@@ -342,14 +347,15 @@ html, body, .stApp {
     color: #1A202C !important;
 }
 [data-testid="stSidebar"] [data-testid="column"]:last-child .stButton > button {
-    background: #E2E8F0 !important;
-    color: #DC2626 !important;
+    background: #374151 !important;
+    color: #F87171 !important;
     font-weight: 700 !important;
     box-shadow: none !important;
+    border: 1px solid #4B5563 !important;
 }
 [data-testid="stSidebar"] [data-testid="column"]:last-child .stButton > button:hover {
-    background: #FEE2E2 !important;
-    color: #DC2626 !important;
+    background: #4B5563 !important;
+    color: #FCA5A5 !important;
 }
 
 .stDownloadButton > button {
@@ -551,30 +557,39 @@ def check_password():
             st.session_state["_login_fail_cnt"] = st.session_state.get("_login_fail_cnt", 0) + 1
             st.session_state["_login_error"] = True
 
-    # ── 로그인 페이지 레이아웃 (좌: 폼, 우: 브랜딩) ──
-    st.markdown("""
+    # ── 로그인 페이지 레이아웃 (좌: 브랜딩 2/3, 우: 폼 1/3) ──
+    _logo_b64 = ""
+    try:
+        with open("BI.jpg", "rb") as f:
+            _logo_b64 = base64.b64encode(f.read()).decode()
+    except Exception:
+        pass
+    _logo_html = f'<img src="data:image/jpeg;base64,{_logo_b64}" class="login-logo"/>' if _logo_b64 else '<div style="width:60px;height:60px;background:rgba(255,255,255,0.15);border-radius:50%;margin-bottom:1.5rem;"></div>'
+
+    st.markdown(f"""
     <style>
-    .login-page { display:flex; min-height:80vh; margin:-1rem -1rem 0; }
-    .login-left { flex:1; display:flex; flex-direction:column; justify-content:center; padding:3rem 4rem; background:#FFFFFF; }
-    .login-right { flex:1; background:linear-gradient(135deg, #0052A3 0%, #0066CC 50%, #3B82F6 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:0 0 0 40px; position:relative; }
-    .login-right-text { color:#FFFFFF; font-size:2.5rem; font-weight:800; line-height:1.2; text-align:center; letter-spacing:-0.02em; }
-    .login-right-sub { color:rgba(255,255,255,0.7); font-size:0.85rem; margin-top:1rem; text-align:center; }
-    .login-brand { font-size:0.75rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.5rem; }
-    .login-main-title { font-size:1.6rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }
-    .login-credit { position:fixed; bottom:1rem; right:1.5rem; font-size:0.68rem; color:#A0AEC0; }
+    .login-left-brand {{
+        position:fixed; left:0; top:0; width:65vw; height:100vh; z-index:0;
+        background:linear-gradient(135deg, #0052A3 0%, #0066CC 50%, #3B82F6 100%);
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }}
+    .login-right-text {{ color:#FFFFFF; font-size:2.2rem; font-weight:800; line-height:1.2; text-align:center; letter-spacing:-0.02em; }}
+    .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.85rem; margin-top:1rem; text-align:center; }}
+    .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.2rem; }}
+    .login-main-title {{ font-size:1.4rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
+    .login-credit {{ position:absolute; bottom:1.5rem; right:1.5rem; font-size:0.68rem; color:rgba(255,255,255,0.5); }}
+    .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
     </style>
-    <div class="login-right" style="position:fixed;right:0;top:0;width:45vw;height:100vh;z-index:0;">
-        <div style="width:60px;height:60px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;">
-            <span style="font-size:1.5rem;">🔵</span>
-        </div>
+    <div class="login-left-brand">
+        {_logo_html}
         <div class="login-right-text">다이소 고객불만<br>AI분석 플랫폼</div>
         <div class="login-right-sub">SNS Issue Finder · KLUE-RoBERTa + Rule-Base</div>
+        <div class="login-credit">Created by 데이터분석팀</div>
     </div>
-    <div class="login-credit">Created by 데이터분석팀</div>
     """, unsafe_allow_html=True)
 
-    left_col, right_col = st.columns([1, 1])
-    with left_col:
+    left_col, right_col = st.columns([2, 1])
+    with right_col:
         st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
         st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
