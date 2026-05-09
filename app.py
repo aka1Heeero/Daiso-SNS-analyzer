@@ -620,12 +620,10 @@ def check_password():
             {_logo_html}
             <div class="login-right-text">다이소 고객불만<br>AI분석 플랫폼</div>
             <div class="login-right-sub">SNS Issue Finder · KLUE-RoBERTa + Rule-Base</div>
-            <div class="login-credit">Created by 데이터분석팀</div>
         </div>
         """, unsafe_allow_html=True)
     with right_col:
         st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
-        st.markdown('<div style="text-align:center;font-size:0.72rem;color:#A0AEC0;letter-spacing:0.1em;margin-bottom:1.5rem;">Created by 데이터분석팀</div>', unsafe_allow_html=True)
 
         # 3번 실패 시 잠금
         if st.session_state["_login_fail_cnt"] >= 3:
@@ -640,8 +638,6 @@ def check_password():
                 # ── 로그인 화면 ──
                 st.text_input("아이디", placeholder="아이디 입력", label_visibility="collapsed", key="login_id")
                 st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
-                if st.button("로그인", use_container_width=True):
-                    _try_login()
                 if st.session_state.pop("_login_empty", False):
                     st.warning("아이디와 비밀번호를 입력하세요.")
                 if st.session_state.pop("_login_error", False):
@@ -651,10 +647,13 @@ def check_password():
                         st.caption(st.session_state["_debug_info"])
                 if st.session_state.get("authenticated"):
                     st.rerun()
-                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+                if st.button("로그인", use_container_width=True):
+                    _try_login()
                 if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
                     st.session_state["_show_pw_change"] = True
                     st.rerun()
+                st.markdown('<div style="text-align:center;font-size:0.68rem;color:#A0AEC0;margin-top:1.5rem;">Created by 데이터분석팀</div>', unsafe_allow_html=True)
 
             elif st.session_state["_show_pw_change"]:
                 # ── 비밀번호 변경 화면 ──
