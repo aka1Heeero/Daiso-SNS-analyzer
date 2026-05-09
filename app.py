@@ -486,7 +486,8 @@ def load_users_from_sheet():
         ws = sh.worksheet("users")
         rows = ws.get_all_records()
         return {r.get("id", "").strip(): {"password": str(r.get("password", "")).strip(), "name": r.get("name", "").strip(), "role": r.get("role", "user").strip()} for r in rows if r.get("id")}
-    except Exception:
+    except Exception as e:
+        st.error(f"⚠ users 시트 로드 실패: {e}")
         return {}
 
 def register_user_to_sheet(uid, pw, name):
@@ -560,8 +561,12 @@ def check_password():
     # ── 로그인 페이지 레이아웃 (좌: 브랜딩 2/3, 우: 폼 1/3) ──
     _logo_b64 = ""
     try:
-        with open("BI.jpg", "rb") as f:
-            _logo_b64 = base64.b64encode(f.read()).decode()
+        import os
+        for p in ["assets/bi.jpg", "assets/BI.jpg", "BI.jpg", "bi.jpg"]:
+            if os.path.exists(p):
+                with open(p, "rb") as f:
+                    _logo_b64 = base64.b64encode(f.read()).decode()
+                break
     except Exception:
         pass
     _logo_html = f'<img src="data:image/jpeg;base64,{_logo_b64}" class="login-logo"/>' if _logo_b64 else '<div style="width:60px;height:60px;background:rgba(255,255,255,0.15);border-radius:50%;margin-bottom:1.5rem;"></div>'
@@ -588,7 +593,7 @@ def check_password():
     </div>
     """, unsafe_allow_html=True)
 
-    left_col, right_col = st.columns([2, 1])
+    _lpad, right_col, _rpad = st.columns([2, 1.2, 0.3])
     with right_col:
         st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
