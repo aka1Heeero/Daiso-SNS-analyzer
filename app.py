@@ -470,38 +470,192 @@ button[kind="secondary"]:hover {
 """, unsafe_allow_html=True)
 
 
-# ============================================== 비밀번호 인증
+# ============================================== 사용자 인증 (구글시트 기반)
+@st.cache_data(ttl=300)
+def load_users_from_sheet():
+    """구글시트 [users] 탭에서 사용자 목록 로드."""
+    try:
+        gc = _get_gspread_client()
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("users")
+        rows = ws.get_all_records()
+        return {r.get("id", "").strip(): {"password": str(r.get("password", "")).strip(), "name": r.get("name", "").strip(), "role": r.get("role", "user").strip()} for r in rows if r.get("id")}
+    except Exception:
+        return {}
+
+def register_user_to_sheet(uid, pw, name):
+    """구글시트 [users] 탭에 새 사용자 등록."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("users")
+        ws.append_row([uid, pw, name, "user", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        load_users_from_sheet.clear()
+        return True
+    except Exception as e:
+        st.error(f"등록 실패: {e}")
+        return False
+
+def log_access(uid, name, action="login"):
+    """구글시트 [access_log] 탭에 접속 기록 저장."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("access_log")
+        ws.append_row([uid, name, action, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    except Exception:
+        pass
+
+def change_password_in_sheet(uid, new_pw):
+    """구글시트 [users] 탭에서 비밀번호 변경."""
+    try:
+        gc = _get_gspread_client(readonly=False)
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("users")
+        records = ws.get_all_records()
+        for idx, r in enumerate(records, 2):
+            if r.get("id", "").strip() == uid:
+                ws.update_cell(idx, 2, new_pw)
+                load_users_from_sheet.clear()
+                return True
+        return False
+    except Exception:
+        return False
+
 def check_password():
     if st.session_state.get("authenticated"):
         return True
 
+    if "_login_fail_cnt" not in st.session_state:
+        st.session_state["_login_fail_cnt"] = 0
+    if "_show_register" not in st.session_state:
+        st.session_state["_show_register"] = False
+    if "_show_pw_change" not in st.session_state:
+        st.session_state["_show_pw_change"] = False
+
+    users = load_users_from_sheet()
+
     def _try_login():
-        if st.session_state.get("login_pw", "") == st.secrets.get("PASSWORD", ""):
+        uid = st.session_state.get("login_id", "").strip()
+        pw = st.session_state.get("login_pw", "").strip()
+        if uid in users and users[uid]["password"] == pw:
             st.session_state.authenticated = True
+            st.session_state["current_user_id"] = uid
+            st.session_state["current_user_name"] = users[uid]["name"]
+            st.session_state["current_user_role"] = users[uid]["role"]
+            st.session_state["_login_fail_cnt"] = 0
+            if users[uid]["role"] == "admin":
+                st.session_state["admin_mode"] = True
+            log_access(uid, users[uid]["name"], "login")
         else:
+            st.session_state["_login_fail_cnt"] = st.session_state.get("_login_fail_cnt", 0) + 1
             st.session_state["_login_error"] = True
 
+    # ── 로그인 페이지 레이아웃 (좌: 폼, 우: 브랜딩) ──
     st.markdown("""
-    <div class="login-wrap">
-        <div class="login-icon">🔵</div>
-        <div class="login-title">DAISO SNS ISSUE FINDER</div>
-        <div class="login-sub">다이소 SNS 상품불량 수집 AI시스템</div>
+    <style>
+    .login-page { display:flex; min-height:80vh; margin:-1rem -1rem 0; }
+    .login-left { flex:1; display:flex; flex-direction:column; justify-content:center; padding:3rem 4rem; background:#FFFFFF; }
+    .login-right { flex:1; background:linear-gradient(135deg, #0052A3 0%, #0066CC 50%, #3B82F6 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:0 0 0 40px; position:relative; }
+    .login-right-text { color:#FFFFFF; font-size:2.5rem; font-weight:800; line-height:1.2; text-align:center; letter-spacing:-0.02em; }
+    .login-right-sub { color:rgba(255,255,255,0.7); font-size:0.85rem; margin-top:1rem; text-align:center; }
+    .login-brand { font-size:0.75rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.5rem; }
+    .login-main-title { font-size:1.6rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }
+    .login-credit { position:fixed; bottom:1rem; right:1.5rem; font-size:0.68rem; color:#A0AEC0; }
+    </style>
+    <div class="login-right" style="position:fixed;right:0;top:0;width:45vw;height:100vh;z-index:0;">
+        <div style="width:60px;height:60px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;">
+            <span style="font-size:1.5rem;">🔵</span>
+        </div>
+        <div class="login-right-text">다이소 고객불만<br>AI분석 플랫폼</div>
+        <div class="login-right-sub">SNS Issue Finder · KLUE-RoBERTa + Rule-Base</div>
     </div>
+    <div class="login-credit">Created by 데이터분석팀</div>
     """, unsafe_allow_html=True)
-    col = st.columns([1, 2, 1])[1]
-    with col:
-        st.text_input(
-            "", type="password", placeholder="비밀번호 입력",
-            label_visibility="collapsed",
-            key="login_pw",
-            on_change=_try_login,
-        )
-        if st.button("로그인", use_container_width=True):
-            _try_login()
-        if st.session_state.pop("_login_error", False):
-            st.error("비밀번호가 올바르지 않습니다.")
-        if st.session_state.get("authenticated"):
-            st.rerun()
+
+    left_col, right_col = st.columns([1, 1])
+    with left_col:
+        st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
+        st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+        # 3번 실패 시 잠금
+        if st.session_state["_login_fail_cnt"] >= 3:
+            st.error("⚠ 3회 로그인 실패. 관리자에게 문의하세요.")
+            st.info("📧 관리자 연락처: 데이터분석팀")
+            return False
+
+        if not st.session_state["_show_register"] and not st.session_state["_show_pw_change"]:
+            # ── 로그인 화면 ──
+            st.text_input("아이디", placeholder="아이디 입력", label_visibility="collapsed", key="login_id")
+            st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
+            if st.button("로그인", use_container_width=True):
+                _try_login()
+            if st.session_state.pop("_login_error", False):
+                remain = 3 - st.session_state["_login_fail_cnt"]
+                st.error(f"아이디 또는 비밀번호가 올바르지 않습니다. (남은 시도: {remain}회)")
+            if st.session_state.get("authenticated"):
+                st.rerun()
+            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                if st.button("🔑 비밀번호 변경", use_container_width=True, type="secondary"):
+                    st.session_state["_show_pw_change"] = True
+                    st.rerun()
+            with bc2:
+                if st.button("📝 회원가입", use_container_width=True, type="secondary"):
+                    st.session_state["_show_register"] = True
+                    st.rerun()
+
+        elif st.session_state["_show_pw_change"]:
+            # ── 비밀번호 변경 화면 ──
+            st.markdown('<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">🔑 비밀번호 변경</div>', unsafe_allow_html=True)
+            chg_id = st.text_input("", placeholder="아이디", label_visibility="collapsed", key="chg_id")
+            chg_old = st.text_input("", type="password", placeholder="현재 비밀번호", label_visibility="collapsed", key="chg_old")
+            chg_new = st.text_input("", type="password", placeholder="새 비밀번호", label_visibility="collapsed", key="chg_new")
+            chg_new2 = st.text_input("", type="password", placeholder="새 비밀번호 확인", label_visibility="collapsed", key="chg_new2")
+            if st.button("변경하기", use_container_width=True):
+                if not chg_id or not chg_old or not chg_new:
+                    st.error("모든 항목을 입력해주세요.")
+                elif chg_new != chg_new2:
+                    st.error("새 비밀번호가 일치하지 않습니다.")
+                elif chg_id not in users:
+                    st.error("존재하지 않는 아이디입니다.")
+                elif users[chg_id]["password"] != chg_old:
+                    st.error("현재 비밀번호가 틀렸습니다.")
+                else:
+                    if change_password_in_sheet(chg_id.strip(), chg_new.strip()):
+                        st.success("✅ 비밀번호 변경 완료!")
+                        st.session_state["_show_pw_change"] = False
+                        st.rerun()
+                    else:
+                        st.error("변경 실패. 다시 시도해주세요.")
+            if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
+                st.session_state["_show_pw_change"] = False
+                st.rerun()
+
+        else:
+            # ── 회원가입 화면 ──
+            st.markdown('<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">📝 회원가입</div>', unsafe_allow_html=True)
+            reg_id = st.text_input("", placeholder="아이디 (영문/숫자)", label_visibility="collapsed", key="reg_id")
+            reg_pw = st.text_input("", type="password", placeholder="비밀번호", label_visibility="collapsed", key="reg_pw")
+            reg_pw2 = st.text_input("", type="password", placeholder="비밀번호 확인", label_visibility="collapsed", key="reg_pw2")
+            reg_name = st.text_input("", placeholder="이름", label_visibility="collapsed", key="reg_name")
+            if st.button("가입하기", use_container_width=True):
+                if not reg_id or not reg_pw or not reg_name:
+                    st.error("모든 항목을 입력해주세요.")
+                elif reg_pw != reg_pw2:
+                    st.error("비밀번호가 일치하지 않습니다.")
+                elif reg_id in users:
+                    st.error("이미 존재하는 아이디입니다.")
+                else:
+                    if register_user_to_sheet(reg_id.strip(), reg_pw.strip(), reg_name.strip()):
+                        st.success("✅ 가입 완료! 로그인해주세요.")
+                        st.session_state["_show_register"] = False
+                        st.rerun()
+            if st.button("← 로그인으로 돌아가기", use_container_width=True, type="secondary"):
+                st.session_state["_show_register"] = False
+                st.rerun()
     return False
 
 if not check_password():
@@ -511,7 +665,6 @@ if not check_password():
 NAVER_CLIENT_ID     = st.secrets["NAVER_CLIENT_ID"]
 NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 YOUTUBE_API_KEY     = st.secrets.get("YOUTUBE_API_KEY", "")
-ADMIN_PASSWORD      = st.secrets.get("ADMIN_PASSWORD", "admin1234")
 
 # ============================================== 관리자 모드 세션 초기화
 for _k, _v in {"admin_mode": False, "admin_show_login": False, "admin_exclude_kws": []}.items():
@@ -1021,8 +1174,9 @@ def is_daiso_related(item: dict) -> bool:
     if any(loc in raw for loc in DAISO_LOCATION_EXCLUDE):
         return False
 
-    # 2) 다이소 + 상품/불만 맥락이 있는지 확인
-    if any(kw in raw for kw in DAISO_CONTEXT_KW):
+    # 2) 다이소 + 상품/불만 맥락이 있는지 확인 (2개 이상 매칭 필요)
+    context_cnt = sum(1 for kw in DAISO_CONTEXT_KW if kw in raw)
+    if context_cnt >= 2:
         return True
     # NEGATIVE/POSITIVE 패턴에 해당하는 것이 있으면 통과
     if has_negative(raw):
