@@ -599,6 +599,17 @@ def check_password():
     .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
     .block-container {{ padding-top:0 !important; max-width:100% !important; }}
     header[data-testid="stHeader"] {{ display:none; }}
+    .stButton > button {{
+        background: #1E293B !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 1rem !important;
+    }}
+    .stButton > button:hover {{
+        background: #334155 !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -613,10 +624,8 @@ def check_password():
         </div>
         """, unsafe_allow_html=True)
     with right_col:
-        st.markdown("<div style='height:15vh'></div>", unsafe_allow_html=True)
-        st.markdown('<div style="text-align:center;"><span class="login-brand">DAISO ISSUE FINDER</span></div>', unsafe_allow_html=True)
-        st.markdown('<div style="text-align:center;" class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
-        st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:30vh'></div>", unsafe_allow_html=True)
+        st.markdown('<div style="text-align:center;font-size:0.72rem;color:#A0AEC0;letter-spacing:0.1em;margin-bottom:1.5rem;">Created by 데이터분석팀</div>', unsafe_allow_html=True)
 
         # 3번 실패 시 잠금
         if st.session_state["_login_fail_cnt"] >= 3:
