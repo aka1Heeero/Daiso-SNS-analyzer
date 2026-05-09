@@ -665,7 +665,7 @@ def check_password():
                         st.error("현재 비밀번호가 틀렸습니다.")
                     else:
                         if change_password_in_sheet(chg_id.strip(), chg_new.strip()):
-                            st.success("✅ 비밀번호 변경 완료!")
+                            st.success("비밀번호가 변경되었습니다.")
                             st.session_state["_show_pw_change"] = False
                             st.rerun()
                         else:
