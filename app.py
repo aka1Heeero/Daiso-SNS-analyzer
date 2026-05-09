@@ -477,11 +477,12 @@ button[kind="secondary"]:hover {
 
 
 # ============================================== 사용자 인증 (구글시트 기반)
-@st.cache_data(ttl=300)
 def load_users_from_sheet():
     """구글시트 [users] 탭에서 사용자 목록 로드."""
     try:
-        gc = _get_gspread_client()
+        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+        gc = gspread.authorize(creds)
         sh = gc.open_by_key(SHEET_ID)
         ws = sh.worksheet("users")
         rows = ws.get_all_records()
@@ -545,6 +546,9 @@ def check_password():
     def _try_login():
         uid = st.session_state.get("login_id", "").strip()
         pw = st.session_state.get("login_pw", "").strip()
+        if not uid or not pw:
+            st.session_state["_login_empty"] = True
+            return
         # DEBUG: 임시 디버그 (확인 후 삭제)
         st.session_state["_debug_info"] = f"입력ID:[{uid}] 입력PW:[{pw}] 시트에존재:{uid in users}"
         if uid in users and users[uid]["password"] == pw:
@@ -619,9 +623,13 @@ def check_password():
             st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed", key="login_pw", on_change=_try_login)
             if st.button("로그인", use_container_width=True):
                 _try_login()
+            if st.session_state.pop("_login_empty", False):
+                st.warning("아이디와 비밀번호를 입력하세요.")
             if st.session_state.pop("_login_error", False):
                 remain = 3 - st.session_state["_login_fail_cnt"]
                 st.error(f"아이디 또는 비밀번호가 올바르지 않습니다. (남은 시도: {remain}회)")
+                if st.session_state.get("_debug_info"):
+                    st.caption(st.session_state["_debug_info"])
             if st.session_state.get("authenticated"):
                 st.rerun()
             st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
