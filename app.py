@@ -483,10 +483,25 @@ def load_users_from_sheet():
         scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
         gc = gspread.authorize(creds)
-        sh = gc.open_by_key(SHEET_ID)
+        sh = gc.open_by_key("1iZS_bBlmZaMRFfW-l6XTP5zUZzit3vxhSIogEB-ynDM")
         ws = sh.worksheet("users")
-        rows = ws.get_all_records()
-        return {r.get("id", "").strip(): {"password": str(r.get("password", "")).strip(), "name": r.get("name", "").strip(), "role": r.get("role", "user").strip()} for r in rows if r.get("id")}
+        all_vals = ws.get_all_values()
+        if len(all_vals) < 2:
+            return {}
+        headers = [h.strip().lower() for h in all_vals[0]]
+        users = {}
+        for row in all_vals[1:]:
+            if len(row) < 4:
+                continue
+            r = dict(zip(headers, row))
+            uid = r.get("id", "").strip()
+            if uid:
+                users[uid] = {
+                    "password": str(r.get("password", "")).strip(),
+                    "name": r.get("name", "").strip(),
+                    "role": r.get("role", "user").strip(),
+                }
+        return users
     except Exception as e:
         st.error(f"⚠ users 시트 로드 실패: {e}")
         return {}
