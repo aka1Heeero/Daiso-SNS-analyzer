@@ -589,13 +589,16 @@ def check_password():
         display:flex; flex-direction:column; align-items:center; justify-content:center;
         min-height: 100vh;
         position: relative;
-        margin: -1rem;
+        margin: -1rem -1rem -1rem -1rem;
     }}
     .login-right-text {{ color:#FFFFFF; font-size:2rem; font-weight:800; line-height:1.2; text-align:center; }}
     .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.82rem; margin-top:0.8rem; text-align:center; }}
-    .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.2rem; }}
-    .login-form-wrap {{ max-width:280px; margin:0 auto; padding-top:15vh; }}
-    .stApp {{ overflow: hidden; }}
+    .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.5rem; display:block; text-align:center; }}
+    .login-main-title {{ font-size:1.2rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; text-align:center; }}
+    .login-credit {{ position:absolute; bottom:1rem; right:1.2rem; font-size:0.65rem; color:rgba(255,255,255,0.5); }}
+    .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
+    .block-container {{ padding-top:0 !important; max-width:100% !important; }}
+    header[data-testid="stHeader"] {{ display:none; }}
     </style>
     """, unsafe_allow_html=True)
 
