@@ -545,6 +545,8 @@ def check_password():
     def _try_login():
         uid = st.session_state.get("login_id", "").strip()
         pw = st.session_state.get("login_pw", "").strip()
+        # DEBUG: 임시 디버그 (확인 후 삭제)
+        st.session_state["_debug_info"] = f"입력ID:[{uid}] 입력PW:[{pw}] 시트에존재:{uid in users}"
         if uid in users and users[uid]["password"] == pw:
             st.session_state.authenticated = True
             st.session_state["current_user_id"] = uid
@@ -574,26 +576,32 @@ def check_password():
     st.markdown(f"""
     <style>
     .login-left-brand {{
-        position:fixed; left:0; top:0; width:65vw; height:100vh; z-index:0;
         background:linear-gradient(135deg, #0052A3 0%, #0066CC 50%, #3B82F6 100%);
+        border-radius: 16px;
+        padding: 3rem 2rem;
         display:flex; flex-direction:column; align-items:center; justify-content:center;
+        min-height: 70vh;
+        position: relative;
     }}
-    .login-right-text {{ color:#FFFFFF; font-size:2.2rem; font-weight:800; line-height:1.2; text-align:center; letter-spacing:-0.02em; }}
-    .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.85rem; margin-top:1rem; text-align:center; }}
+    .login-right-text {{ color:#FFFFFF; font-size:2rem; font-weight:800; line-height:1.2; text-align:center; }}
+    .login-right-sub {{ color:rgba(255,255,255,0.7); font-size:0.82rem; margin-top:0.8rem; text-align:center; }}
     .login-brand {{ font-size:0.72rem; color:#A0AEC0; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1.2rem; }}
-    .login-main-title {{ font-size:1.4rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
-    .login-credit {{ position:absolute; bottom:1.5rem; right:1.5rem; font-size:0.68rem; color:rgba(255,255,255,0.5); }}
+    .login-main-title {{ font-size:1.3rem; font-weight:800; color:#1A202C; margin-bottom:0.3rem; }}
+    .login-credit {{ position:absolute; bottom:1rem; right:1.2rem; font-size:0.65rem; color:rgba(255,255,255,0.5); }}
     .login-logo {{ width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:1.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.2); }}
     </style>
-    <div class="login-left-brand">
-        {_logo_html}
-        <div class="login-right-text">다이소 고객불만<br>AI분석 플랫폼</div>
-        <div class="login-right-sub">SNS Issue Finder · KLUE-RoBERTa + Rule-Base</div>
-        <div class="login-credit">Created by 데이터분석팀</div>
-    </div>
     """, unsafe_allow_html=True)
 
-    _lpad, right_col, _rpad = st.columns([2, 1.2, 0.3])
+    left_col, right_col = st.columns([1.5, 1])
+    with left_col:
+        st.markdown(f"""
+        <div class="login-left-brand">
+            {_logo_html}
+            <div class="login-right-text">다이소 고객불만<br>AI분석 플랫폼</div>
+            <div class="login-right-sub">SNS Issue Finder · KLUE-RoBERTa + Rule-Base</div>
+            <div class="login-credit">Created by 데이터분석팀</div>
+        </div>
+        """, unsafe_allow_html=True)
     with right_col:
         st.markdown('<div class="login-brand">DAISO ISSUE FINDER</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-main-title">다이소 고객불만 AI분석 플랫폼</div>', unsafe_allow_html=True)
@@ -2547,7 +2555,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             <div class="card" style="margin-bottom:0.75rem;">
                 <div style="font-size:0.82rem;font-weight:700;color:#475569;margin-bottom:0.5rem;">🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)</div>
                 <div style="display:flex;flex-wrap:wrap;gap:2px;">{url_badges}</div>
-            </div>''', unsafe_allow_html=True)
+            </div>''', unsafe_allow_html=True)y
 
 st.markdown("""
 <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
