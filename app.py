@@ -2555,7 +2555,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             <div class="card" style="margin-bottom:0.75rem;">
                 <div style="font-size:0.82rem;font-weight:700;color:#475569;margin-bottom:0.5rem;">🔗 제외 URL ({len(EXCLUDED_URLS_FROM_SHEET)}건)</div>
                 <div style="display:flex;flex-wrap:wrap;gap:2px;">{url_badges}</div>
-            </div>''', unsafe_allow_html=True)y
+            </div>''', unsafe_allow_html=True)
 
 st.markdown("""
 <div style="text-align:center;padding:2rem 0 1rem;border-top:1px solid #E2E8F0;margin-top:2rem;">
