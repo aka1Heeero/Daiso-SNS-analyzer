@@ -874,13 +874,13 @@ def load_roberta():
         model = ORTModelForSequenceClassification.from_pretrained(model_name, export=True)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         return pipeline("text-classification", model=model, tokenizer=tokenizer,
-                        truncation=True, max_length=128, top_k=None)
+                        truncation=True, max_length=192, top_k=None, device=-1)
     except Exception:
         pass
     # fallback: 기본 PyTorch
     try:
         return pipeline("text-classification", model=model_name,
-                        truncation=True, max_length=128, top_k=None, device=-1)
+                        truncation=True, max_length=192, top_k=None, device=-1)
     except Exception:
         return None
 
@@ -2046,11 +2046,11 @@ if run_btn:
             src   = item.get("출처","")
             title = clean_text(item.get("title",""))
             desc  = clean_text(item.get("description",""))
-            full = (title + " " + desc)[:200]
+            full = (title + " " + desc)[:300]
             texts.append(full)
             metas.append((src, item, title))
 
-        r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=128) if model_r else [None]*len(texts)
+        r_batch = model_r(texts, batch_size=BATCH, truncation=True, max_length=192) if model_r else [None]*len(texts)
 
         for idx, (full, (src, item, title)) in enumerate(zip(texts, metas)):
             # 검색어에 포함된 단어를 룰베이스에서 제외
