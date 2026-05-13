@@ -2364,6 +2364,35 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             start_yt = (current_page_yt - 1) * PAGE_SIZE_YT
             page_yt = yt_sorted[start_yt:start_yt + PAGE_SIZE_YT]
     
+            # ── 골드셋 버튼 (관리자, 목록 위에 배치 — 블로그/카페 탭과 동일) ──
+            if st.session_state.get("admin_mode"):
+                checked_yt_items = [(i, page_yt[i]) for i in range(len(page_yt))
+                                    if st.session_state.get(f"chk_yt_{current_page_yt}_{i}")]
+                checked_yt_urls = [item["link"] for _, item in checked_yt_items]
+
+                _sp, _g1, _g2, _g3 = st.columns([5, 1.5, 1.5, 1.5])
+                with _g1:
+                    if st.button(f"✅ [긍정] AI학습({len(checked_yt_urls)})", key=f"gold_pos_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0, use_container_width=True, type="secondary"):
+                        for _, item in checked_yt_items:
+                            append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")))
+                        st.success(f"✅ {len(checked_yt_urls)}건 긍정 골드셋 저장")
+                        st.rerun()
+                with _g2:
+                    if st.button(f"❌ [부정] AI학습({len(checked_yt_urls)})", key=f"gold_neg_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0, use_container_width=True, type="secondary"):
+                        for _, item in checked_yt_items:
+                            append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")))
+                        st.success(f"✅ {len(checked_yt_urls)}건 부정 골드셋 저장")
+                        st.rerun()
+                with _g3:
+                    if st.button(f"🚫 학습제외({len(checked_yt_urls)})", key=f"bulk_exc_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0, use_container_width=True, type="secondary"):
+                        for url in checked_yt_urls:
+                            append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
+                        st.session_state["analysis_results"] = [
+                            r for r in st.session_state["analysis_results"] if r.get("link") not in checked_yt_urls
+                        ]
+                        st.success(f"✅ {len(checked_yt_urls)}건 제외 완료")
+                        st.rerun()
+
             for yt_idx, r in enumerate(page_yt):
                 b = SENT_BADGE.get(r["감성"],"")
                 views    = f"{r['views']:,}"    if isinstance(r.get("views"),int)    else "-"
@@ -2392,34 +2421,6 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
                         st.markdown(_card_html, unsafe_allow_html=True)
                 else:
                     st.markdown(_card_html, unsafe_allow_html=True)
-    
-            if st.session_state.get("admin_mode"):
-                checked_yt_items = [(i, page_yt[i]) for i in range(len(page_yt))
-                                    if st.session_state.get(f"chk_yt_{current_page_yt}_{i}")]
-                checked_yt_urls = [item["link"] for _, item in checked_yt_items]
-
-                gs_col1, gs_col2, gs_col3 = st.columns(3)
-                with gs_col1:
-                    if st.button(f"✅ 긍정 골드셋 ({len(checked_yt_urls)}건)", key=f"gold_pos_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
-                        for _, item in checked_yt_items:
-                            append_goldset_to_sheet(item["link"], item.get("title",""), "긍정", clean_text(item.get("title","")))
-                        st.success(f"✅ {len(checked_yt_urls)}건 긍정 골드셋 저장")
-                        st.rerun()
-                with gs_col2:
-                    if st.button(f"❌ 부정 골드셋 ({len(checked_yt_urls)}건)", key=f"gold_neg_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
-                        for _, item in checked_yt_items:
-                            append_goldset_to_sheet(item["link"], item.get("title",""), "부정", clean_text(item.get("title","")))
-                        st.success(f"✅ {len(checked_yt_urls)}건 부정 골드셋 저장")
-                        st.rerun()
-                with gs_col3:
-                    if st.button(f"🚫 선택 제외 ({len(checked_yt_urls)}건)", key=f"bulk_exc_yt_{current_page_yt}", disabled=len(checked_yt_urls)==0):
-                        for url in checked_yt_urls:
-                            append_excluded_url_to_sheet(url, reason="관리자 일괄 제외")
-                        st.session_state["analysis_results"] = [
-                            r for r in st.session_state["analysis_results"] if r.get("link") not in checked_yt_urls
-                        ]
-                        st.success(f"✅ {len(checked_yt_urls)}건 제외 완료")
-                        st.rerun()
     
             if total_pages_yt > 1:
                 yp1, yp2, yp3 = st.columns([1, 2, 1])
