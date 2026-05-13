@@ -2325,7 +2325,7 @@ if "analysis_results" in st.session_state and st.session_state["analysis_results
             st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
             # ── 필터(왼쪽) + 정렬(오른쪽) ──
-            yt_fcol, _, yt_scol = st.columns([3, 4, 4])
+            yt_fcol, _, yt_scol = st.columns([3, 3, 4])
             with yt_fcol:
                 yt_current_filter = st.radio("감성 필터", ["전체", "긍정", "부정", "중립"], key="filter_유튜브", horizontal=True, label_visibility="collapsed")
             with yt_scol:
